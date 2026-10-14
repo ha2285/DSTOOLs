@@ -1,0 +1,956 @@
+<title>Chart Chooser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a numbered course rail (matplotlib → seaborn → specialist charts) beside one lesson: live chart + spec sheet, then live code */
+:root{
+  --bg:#f2f4f7; --surface:#ffffff; --ink:#141a26; --muted:#586379; --line:#d6dbe5; --grid:#e8ebf1; --chip:#e9eefb; --code:#f6f7fa;
+  --accent:#2c52c9; --accent-2:#d17a1f; --good:#1d7f53; --warn:#a86a0c; --bad:#c03a12;
+  --s1:#2c52c9; --s2:#d17a1f; --s3:#1d7f53; --s4:#9b3a98; --s5:#c23b4f; --s6:#7a8395; --s7:#2a9bb0;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e121a; --surface:#161b25; --ink:#e6eaf2; --muted:#98a2b6; --line:#2a3242; --grid:#212836; --chip:#1f2840; --code:#11151d;
+    --accent:#7f9cff; --accent-2:#f0a24f; --good:#4cc38a; --warn:#e8b14d; --bad:#ff7a52;
+    --s1:#7f9cff; --s2:#f0a24f; --s3:#4cc38a; --s4:#d27ed0; --s5:#ff7b8a; --s6:#9aa3b5; --s7:#56c6da;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e121a; --surface:#161b25; --ink:#e6eaf2; --muted:#98a2b6; --line:#2a3242; --grid:#212836; --chip:#1f2840; --code:#11151d;
+  --accent:#7f9cff; --accent-2:#f0a24f; --good:#4cc38a; --warn:#e8b14d; --bad:#ff7a52;
+  --s1:#7f9cff; --s2:#f0a24f; --s3:#4cc38a; --s4:#d27ed0; --s5:#ff7b8a; --s6:#9aa3b5; --s7:#56c6da;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:15px; line-height:1.55}
+.wrap{max-width:1320px; margin:0 auto; padding-inline:clamp(16px,3vw,36px); padding-block:24px 56px}
+h1,h2,h3{font-family:var(--f-display); text-wrap:balance; margin:0; letter-spacing:-0.01em}
+code,.mono{font-family:var(--f-mono)}
+.mast{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px 32px; padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid var(--line)}
+.mast h1{font-size:clamp(28px,4vw,40px); font-weight:700}
+.mast p{margin:6px 0 0; color:var(--muted); max-width:70ch}
+.lv{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--muted)}
+.ld{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:1px}
+.ld.Basic{background:var(--good)} .ld.Intermediate{background:var(--warn)} .ld.Advanced{background:var(--bad)}
+.shell{display:grid; grid-template-columns:270px minmax(0,1fr); gap:28px; align-items:start}
+.rail{position:sticky; top:calc(env(safe-area-inset-top,0px) + 12px); max-height:calc(100vh - 24px); overflow-y:auto; padding-right:4px}
+.rail h4{font-family:var(--f-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:16px 0 4px 8px; font-weight:500}
+.rail h4:first-child{margin-top:0}
+.rail h4 span{display:block; font-family:var(--f-body); text-transform:none; letter-spacing:0; font-size:12px; color:var(--muted)}
+.rail button{all:unset; cursor:pointer; display:grid; grid-template-columns:26px 1fr auto; align-items:baseline; gap:6px; width:100%; box-sizing:border-box; padding:5px 8px; border-radius:6px; font-size:13.5px}
+.rail button .n{font-family:var(--f-mono); font-size:11px; color:var(--muted)}
+.rail button .fn{font-family:var(--f-mono); font-size:11px; color:var(--muted); white-space:nowrap}
+.rail button:hover{background:var(--surface)}
+.rail button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+.rail button[aria-current="true"]{background:var(--surface); box-shadow:inset 3px 0 0 var(--accent); font-weight:600}
+.rail button[aria-current="true"] .n{color:var(--accent)}
+.mnav{display:none; gap:8px; margin-bottom:16px}
+.mnav select{flex:1; min-width:0}
+@media (max-width:980px){.shell{grid-template-columns:1fr}.rail{display:none}.mnav{display:flex}}
+.lesson{min-width:0}
+.eyebrow{font-family:var(--f-mono); font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:var(--accent); margin:0 0 6px}
+.head{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:10px 20px}
+.head h2{font-size:clamp(24px,3vw,32px); font-weight:700}
+.tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.tag{font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--chip); color:var(--ink); display:inline-flex; align-items:center}
+.tag.fn{font-family:var(--f-mono); font-weight:500; color:var(--accent)}
+.pn{display:flex; gap:6px}
+.lede{margin:12px 0 4px; max-width:72ch}
+.datanote{margin:0 0 16px; font-size:13px; color:var(--muted); max-width:90ch}
+.stage{display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:18px; align-items:start}
+@media (max-width:1180px){.stage{grid-template-columns:1fr}}
+figure{margin:0; min-width:0; background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden}
+canvas#cv{display:block; width:100%; height:440px}
+canvas#cv.tall{height:520px}
+.ctlbar{display:flex; flex-wrap:wrap; gap:12px 20px; align-items:flex-end; padding:12px 16px; border-top:1px solid var(--line); background:var(--code)}
+.ctl{display:flex; flex-direction:column; gap:4px; min-width:130px}
+.ctl > .lbl{font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:8px}
+.ctl output{font-family:var(--f-mono); text-transform:none; letter-spacing:0; color:var(--ink); font-variant-numeric:tabular-nums}
+input[type=range]{width:100%; min-width:130px; accent-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent); width:16px; height:16px; margin:0}
+.check{display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; padding-bottom:3px}
+select{font:inherit; font-size:14px; padding:5px 8px; border-radius:5px; border:1px solid var(--line); background:var(--surface); color:var(--ink)}
+.seg{display:flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--surface)}
+.seg label{text-align:center; font-size:13px; padding:5px 9px; cursor:pointer; border-right:1px solid var(--line); white-space:nowrap}
+.seg label:last-child{border-right:0}
+.seg input{position:absolute; opacity:0; pointer-events:none}
+.seg label:has(input:checked){background:var(--accent); color:var(--surface); font-weight:600}
+.seg label:has(input:focus-visible){outline:2px solid var(--accent); outline-offset:-2px}
+.spec{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:16px; display:flex; flex-direction:column; gap:12px; min-width:0}
+.spec h4{font-family:var(--f-body); font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin:0 0 4px; color:var(--muted)}
+.spec ul{margin:0; padding-left:0; list-style:none; font-size:14px; display:flex; flex-direction:column; gap:3px}
+.spec li{padding-left:18px; position:relative}
+.pro li::before{content:"+"; position:absolute; left:2px; color:var(--good); font-weight:700}
+.con li::before{content:"−"; position:absolute; left:2px; color:var(--bad); font-weight:700}
+.spec p{margin:0; font-size:14px}
+.uw{display:grid; gap:10px; border-top:1px solid var(--line); padding-top:12px}
+.trap{background:var(--chip); border-radius:6px; padding:10px 12px; font-size:13.5px}
+.trap b{color:var(--bad); font-weight:600}
+.drawer{margin-top:18px; background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden}
+.drawer-head{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--line)}
+.tabs{display:flex; flex-wrap:wrap; gap:4px}
+.tab{font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:6px; border:1px solid transparent; background:none; color:var(--muted); cursor:pointer}
+.tab[aria-selected="true"]{background:var(--chip); color:var(--accent)}
+.tab:focus-visible,.btn:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.btn{font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.4; cursor:default}
+pre{margin:0; padding:16px; overflow-x:auto; background:var(--code); font-family:var(--f-mono); font-size:13px; line-height:1.6; color:var(--ink); white-space:pre}
+pre.wrapme{white-space:pre-wrap}
+.live{font-size:11px; font-weight:600; color:var(--good); letter-spacing:.04em; text-transform:uppercase}
+.drawer-foot{padding:8px 16px; font-size:12px; color:var(--muted); border-top:1px solid var(--line)}
+.bottomnav{display:flex; justify-content:space-between; gap:12px; margin-top:18px}
+.bottomnav .btn{max-width:48%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.finder{display:flex; flex-direction:column; gap:22px}
+.qgroup h3{font-size:18px; margin-bottom:8px}
+.qgroup p.small{margin:-4px 0 8px; font-size:13px; color:var(--muted)}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+th,td{padding:8px 12px; text-align:left; border-bottom:1px solid var(--grid); vertical-align:top}
+th{font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); white-space:nowrap}
+td.n{white-space:nowrap}
+td.n button{all:unset; cursor:pointer; color:var(--accent); font-weight:600}
+td.n button:focus-visible{outline:2px solid var(--accent)}
+td.lib{white-space:nowrap; font-family:var(--f-mono); font-size:12px; color:var(--muted)}
+tr:last-child td{border-bottom:0}
+.rules{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px}
+.rule{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px; min-width:0}
+.rule h4{font-family:var(--f-display); font-size:16px; margin:0 0 4px}
+.rule p{margin:0; font-size:14px; color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <h1>Chart Chooser</h1>
+      <p>A step-by-step path through Python's charting tools: matplotlib and pandas first, then seaborn, then specialist charts. Every step has a live chart, its strengths and weaknesses, when to use or avoid it, and code that updates as you change the controls.</p>
+    </div>
+    <div class="lv" aria-label="Level key"><span><span class="ld Basic"></span>Basic</span><span><span class="ld Intermediate"></span>Intermediate</span><span><span class="ld Advanced"></span>Advanced</span></div>
+  </header>
+
+  <div class="shell">
+    <nav class="rail" id="rail" aria-label="Lessons"></nav>
+    <main class="lesson">
+      <div class="mnav"><button class="btn" id="m-prev" aria-label="Previous step">←</button><select id="m-sel" aria-label="Jump to step"></select><button class="btn" id="m-next" aria-label="Next step">→</button></div>
+
+      <section id="lessonview">
+        <p class="eyebrow" id="l-eyebrow"></p>
+        <div class="head">
+          <div>
+            <h2 id="l-name"></h2>
+            <div class="tags"><span class="tag fn" id="l-fn"></span><span class="tag" id="l-level"></span><span class="tag" id="l-q"></span></div>
+          </div>
+          <div class="pn"><button class="btn" id="prev">← Previous</button><button class="btn" id="next">Next →</button></div>
+        </div>
+        <p class="lede" id="l-what"></p>
+        <p class="datanote" id="l-data"></p>
+        <div class="stage">
+          <figure>
+            <canvas id="cv" aria-label="Live chart"></canvas>
+            <div class="ctlbar" id="ctl"></div>
+          </figure>
+          <aside class="spec" aria-live="polite">
+            <div class="pro"><h4>Strengths</h4><ul id="s-pro"></ul></div>
+            <div class="con"><h4>Weaknesses</h4><ul id="s-con"></ul></div>
+            <div class="uw">
+              <div><h4>Use it when</h4><p id="s-use"></p></div>
+              <div><h4>Avoid it when</h4><p id="s-avoid"></p></div>
+            </div>
+            <div class="trap" id="s-trap"></div>
+          </aside>
+        </div>
+        <div class="drawer">
+          <div class="drawer-head">
+            <div class="tabs" role="tablist">
+              <button class="tab" role="tab" id="tab-py" aria-selected="true">Python</button>
+              <button class="tab" role="tab" id="tab-ai" aria-selected="false">Prompt for an AI assistant</button>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center"><span class="live" id="live">Updates with the controls</span><button class="btn" id="copy">Copy</button></div>
+          </div>
+          <pre id="code"></pre>
+          <div class="drawer-foot" id="code-foot"></div>
+        </div>
+        <div class="bottomnav"><button class="btn" id="prev2"></button><button class="btn" id="next2"></button></div>
+      </section>
+
+      <section id="finderview" class="finder" hidden>
+        <div>
+          <p class="eyebrow">Reference</p>
+          <h2>Chart finder</h2>
+          <p class="lede">Start from the question you want the data to answer. Each row links back to its lesson.</p>
+        </div>
+        <div id="finder"></div>
+        <div>
+          <p class="eyebrow">Rules that apply to every chart</p>
+          <div class="rules">
+            <div class="rule"><h4>Start from the question</h4><p>Decide what the reader should compare or notice, then pick the chart.</p></div>
+            <div class="rule"><h4>Title the takeaway</h4><p>"IT pays the most" tells readers what to see. "Salary by department" does not.</p></div>
+            <div class="rule"><h4>Label axes with units</h4><p>Years, $, kg. Say when an axis is log-scaled or doesn't start at zero.</p></div>
+            <div class="rule"><h4>Zero baseline for length and area</h4><p>Bars and areas start at zero. Dots and lines may zoom in.</p></div>
+            <div class="rule"><h4>Color with meaning</h4><p>Categorical palettes for groups, sequential for order, diverging when a midpoint matters. Prefer colorblind-safe palettes.</p></div>
+            <div class="rule"><h4>Show the data behind summaries</h4><p>Pair bars of means, boxes and trend lines with the raw points when the sample allows.</p></div>
+            <div class="rule"><h4>Matplotlib for control, seaborn for statistics</h4><p>Seaborn returns matplotlib objects, so you can always finish a seaborn chart with plt.title(), plt.xlabel() and so on.</p></div>
+            <div class="rule"><h4>Check what AI-written code drew</h4><p>Generated charts often default to truncated axes, unsorted bars or misleading colormaps. Review before you share.</p></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+const $=(s,r=document)=>r.querySelector(s);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function pal(){const s=[1,2,3,4,5,6,7].map(i=>css('--s'+i));return{ink:css('--ink'),muted:css('--muted'),line:css('--line'),grid:css('--grid'),surface:css('--surface'),code:css('--code'),accent:css('--accent'),accent2:css('--accent-2'),bad:css('--bad'),good:css('--good'),s,mono:'500 11px "IBM Plex Mono", ui-monospace, monospace',sans:'500 12px "IBM Plex Sans", system-ui, sans-serif',bold:'600 12.5px "IBM Plex Sans", system-ui, sans-serif',title:'700 14px "Bricolage Grotesque", system-ui, sans-serif'};}
+const lin=(d0,d1,r0,r1)=>v=>r0+(v-d0)/(d1-d0)*(r1-r0);
+function ticks(a,b,n=5){const st0=(b-a)/n;const mag=10**Math.floor(Math.log10(st0));const e=st0/mag;const st=mag*(e>=7.5?10:e>=3.5?5:e>=1.5?2:1);const t=[];for(let v=Math.ceil(a/st-1e-9)*st;v<=b+st*1e-9;v+=st)t.push(+v.toFixed(10));return t;}
+const fmt=(v,d=0)=>v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const short=v=>Math.abs(v)>=1e6?(+(v/1e6).toFixed(1))+'M':Math.abs(v)>=1e3?(+(v/1e3).toFixed(0))+'k':''+(+v.toFixed(2));
+function axes(ctx,f,o){const P=o.P;ctx.save();ctx.font=P.mono;ctx.lineWidth=1;ctx.strokeStyle=P.grid;ctx.fillStyle=P.muted;
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(const v of (o.yt||[])){const y=Math.round(o.y(v))+.5;if(y<f.t-1||y>f.b+1)continue;if(!o.noYgrid){ctx.beginPath();ctx.moveTo(f.l,y);ctx.lineTo(f.r,y);ctx.stroke();}ctx.fillText(o.yf?o.yf(v):short(v),f.l-6,y);}
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(const v of (o.xt||[])){const x=o.x(v);if(x<f.l-1||x>f.r+1)continue;if(o.xgrid){ctx.beginPath();ctx.moveTo(Math.round(x)+.5,f.t);ctx.lineTo(Math.round(x)+.5,f.b);ctx.stroke();}ctx.fillText(o.xf?o.xf(v):short(v),x,f.b+6);}
+  ctx.strokeStyle=P.line;ctx.beginPath();ctx.moveTo(f.l,Math.round(f.b)+.5);ctx.lineTo(f.r,Math.round(f.b)+.5);if(o.box){ctx.lineTo(f.r,f.t);ctx.lineTo(f.l,f.t);ctx.lineTo(f.l,f.b);}ctx.stroke();
+  ctx.font=P.sans;ctx.fillStyle=P.muted;
+  if(o.xl){ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(o.xl,(f.l+f.r)/2,f.b+22);}
+  if(o.yl){ctx.textAlign='left';ctx.textBaseline='bottom';ctx.fillText(o.yl,f.l,f.t-8);}
+  ctx.restore();}
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function normal(r){return()=>{let u=0;while(u===0)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());};}
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const sd=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-1));};
+function ols(x,y){const n=x.length;const mx=mean(x),my=mean(y);let sxx=0,syy=0,sxy=0;for(let i=0;i<n;i++){const dx=x[i]-mx,dy=y[i]-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;}const b=sxy/sxx,a=my-b*mx;let rss=0;for(let i=0;i<n;i++)rss+=(y[i]-a-b*x[i])**2;return{b,a,r:sxy/Math.sqrt(sxx*syy),mx,sxx,s:Math.sqrt(rss/(n-2)),n};}
+function kde(arr,bw,xs){const k=1/(arr.length*bw*Math.sqrt(2*Math.PI));return xs.map(x=>{let s=0;for(const v of arr){const z=(x-v)/bw;s+=Math.exp(-.5*z*z);}return s*k;});}
+const scott=a=>sd(a)*Math.pow(a.length,-.2);
+const quant=(arr,p)=>{const s=[...arr].sort((a,b)=>a-b);const i=(s.length-1)*p,lo=Math.floor(i);return s[lo]+(s[Math.ceil(i)]-s[lo])*(i-lo);};
+const range=(a,b,n)=>Array.from({length:n},(_,i)=>a+(b-a)*i/(n-1));
+const dom=(arr,p=.05)=>{const mn=Math.min(...arr),mx=Math.max(...arr),r=(mx-mn)||1;return[mn-p*r,mx+p*r];};
+const cl=v=>Math.max(0,Math.min(1,v));
+function viridis(t){const c0=[.2777,.0054,.3341],c1=[.1051,1.4046,1.3846],c2=[-.3309,.2148,.0951],c3=[-4.6342,-5.7991,-19.3324],c4=[6.2283,14.1799,56.6906],c5=[4.7764,-13.7451,-65.3530],c6=[-5.4355,4.6459,26.3124];return[0,1,2].map(k=>cl(c0[k]+t*(c1[k]+t*(c2[k]+t*(c3[k]+t*(c4[k]+t*(c5[k]+t*c6[k])))))));}
+const hex2=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255);
+const stops=arr=>t=>{t=cl(t);const n=arr.length-1,i=Math.min(n-1,Math.floor(t*n)),u=t*n-i;const a=hex2(arr[i]),b=hex2(arr[i+1]);return a.map((v,k)=>v+(b[k]-v)*u);};
+const CMAP={rocket:stops(['#03051a','#4c1d4b','#a11a5b','#e83f3f','#f69c73','#faebdd']),coolwarm:stops(['#3b4cc0','#8db0fe','#dddddd','#f49a7b','#b40426']),viridis,RdBu_r:stops(['#2166ac','#92c5de','#f7f7f7','#f4a582','#b2182b'])};
+const rgb=c=>`rgb(${c[0]*255|0},${c[1]*255|0},${c[2]*255|0})`;
+const lum=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
+function note(ctx,P,text,x,y,color,align='left'){ctx.save();ctx.font=P.bold;ctx.fillStyle=color||P.ink;ctx.textAlign=align;ctx.textBaseline='bottom';ctx.fillText(text,x,y);ctx.restore();}
+function legend(ctx,P,items,x,y,shape){ctx.save();ctx.font=P.sans;ctx.textBaseline='middle';ctx.textAlign='left';let lx=x;for(const[name,col]of items){ctx.fillStyle=col;if(shape==='line'){ctx.fillRect(lx,y-1.5,14,3);}else ctx.fillRect(lx,y-5,10,10);ctx.fillStyle=P.ink;ctx.fillText(name,lx+(shape==='line'?18:14),y);lx+=ctx.measureText(name).width+32;}ctx.restore();}
+function mark(ctx,m,x,y,sz,col,lw=1.5){ctx.fillStyle=col;ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();
+  if(m==='o'||m==='.'){ctx.arc(x,y,m==='.'?Math.max(1.5,sz/3):sz/2,0,7);ctx.fill();}
+  else if(m==='^'){ctx.moveTo(x,y-sz/1.6);ctx.lineTo(x+sz/1.8,y+sz/2.6);ctx.lineTo(x-sz/1.8,y+sz/2.6);ctx.closePath();ctx.fill();}
+  else if(m==='s'){ctx.rect(x-sz/2.3,y-sz/2.3,sz/1.15,sz/1.15);ctx.fill();}
+  else if(m==='x'){ctx.moveTo(x-sz/2,y-sz/2);ctx.lineTo(x+sz/2,y+sz/2);ctx.moveTo(x+sz/2,y-sz/2);ctx.lineTo(x-sz/2,y+sz/2);ctx.stroke();}
+  else if(m==='D'){ctx.moveTo(x,y-sz/1.7);ctx.lineTo(x+sz/2.2,y);ctx.lineTo(x,y+sz/1.7);ctx.lineTo(x-sz/2.2,y);ctx.closePath();ctx.fill();}}
+function path(ctx,xs,ys,X,Y){ctx.beginPath();xs.forEach((x,i)=>i?ctx.lineTo(X(x),Y(ys[i])):ctx.moveTo(X(x),Y(ys[i])));}
+function pie(ctx,P,cx,cy,r,vals,names,cols,o={}){const tot=vals.reduce((a,b)=>a+b,0);let a0=o.start!=null?o.start:0;const dir=o.cw?1:-1;ctx.save();
+  vals.forEach((v,i)=>{const da=dir*v/tot*2*Math.PI,a1=a0+da,am=a0+da/2;const ex=(o.explode&&o.explode[i])?r*.1:0;const ox=Math.cos(am)*ex,oy=Math.sin(am)*ex;
+   ctx.beginPath();ctx.moveTo(cx+ox,cy+oy);ctx.arc(cx+ox,cy+oy,r,Math.min(a0,a1),Math.max(a0,a1));ctx.closePath();ctx.fillStyle=cols[i%cols.length];ctx.fill();ctx.strokeStyle=P.surface;ctx.lineWidth=2;ctx.stroke();
+   const lx=cx+ox+Math.cos(am)*(r+12),ly=cy+oy+Math.sin(am)*(r+12);ctx.fillStyle=P.ink;ctx.font=P.sans;ctx.textAlign=Math.cos(am)>=0?'left':'right';ctx.textBaseline='middle';ctx.fillText(o.outLabel?o.outLabel(i,v/tot):names[i],lx,ly);
+   if(o.pct){ctx.fillStyle='#ffffff';ctx.font=P.bold;ctx.textAlign='center';ctx.fillText((v/tot*100).toFixed(o.pctd==null?1:o.pctd)+'%',cx+ox+Math.cos(am)*r*(o.inner?(1+o.inner)/2:.62),cy+oy+Math.sin(am)*r*(o.inner?(1+o.inner)/2:.62));}
+   a0=a1;});
+  if(o.inner){ctx.beginPath();ctx.arc(cx,cy,r*o.inner,0,7);ctx.fillStyle=P.surface;ctx.fill();}
+  ctx.restore();}
+function catX(f,n){const band=(f.r-f.l)/n;return{band,c:i=>f.l+band*(i+.5)};}
+function catLabels(ctx,P,f,names,c){ctx.save();ctx.fillStyle=P.muted;ctx.font=P.sans;ctx.textAlign='center';ctx.textBaseline='top';names.forEach((n,i)=>ctx.fillText(n,c(i),f.b+6));ctx.restore();}
+function boxStats(a){const q1=quant(a,.25),md=quant(a,.5),q3=quant(a,.75),iq=q3-q1;const s=[...a].sort((x,y)=>x-y);const lo=s.find(v=>v>=q1-1.5*iq),hi=[...s].reverse().find(v=>v<=q3+1.5*iq);return{q1,md,q3,lo,hi,out:s.filter(v=>v<lo||v>hi)};}
+function drawBox(ctx,P,cx,bw,Y,a,col,alpha=.75){const b=boxStats(a);ctx.save();ctx.strokeStyle=P.ink;ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(cx,Y(b.lo));ctx.lineTo(cx,Y(b.q1));ctx.moveTo(cx,Y(b.q3));ctx.lineTo(cx,Y(b.hi));ctx.moveTo(cx-bw/4,Y(b.lo));ctx.lineTo(cx+bw/4,Y(b.lo));ctx.moveTo(cx-bw/4,Y(b.hi));ctx.lineTo(cx+bw/4,Y(b.hi));ctx.stroke();
+  ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fillRect(cx-bw/2,Y(b.q3),bw,Y(b.q1)-Y(b.q3));ctx.globalAlpha=1;ctx.strokeRect(cx-bw/2,Y(b.q3),bw,Y(b.q1)-Y(b.q3));ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx-bw/2,Y(b.md));ctx.lineTo(cx+bw/2,Y(b.md));ctx.stroke();
+  ctx.fillStyle=P.ink;b.out.forEach(v=>{ctx.beginPath();ctx.arc(cx,Y(v),2.6,0,7);ctx.stroke();});ctx.restore();return b;}
+function violin(ctx,P,cx,mw,Y,a,col,o={}){const bw=scott(a)*(o.adj||1);const lo=o.cut0?Math.min(...a):Math.min(...a)-2*bw,hi=o.cut0?Math.max(...a):Math.max(...a)+2*bw;const ys=range(lo,hi,120);const k=kde(a,bw,ys);const m=Math.max(...k);
+  ctx.save();ctx.fillStyle=col;ctx.globalAlpha=.7;ctx.beginPath();ys.forEach((y,i)=>{const x=cx+k[i]/m*mw;i?ctx.lineTo(x,Y(y)):ctx.moveTo(x,Y(y));});for(let i=ys.length-1;i>=0;i--)ctx.lineTo(cx-k[i]/m*mw,Y(ys[i]));ctx.closePath();ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=P.ink;ctx.lineWidth=1;ctx.stroke();ctx.restore();return{ys,k,m};}
+function hist(a,edges){const c=new Array(edges.length-1).fill(0);const lo=edges[0],w=edges[1]-edges[0];a.forEach(v=>{let i=Math.floor((v-lo)/w);if(i===c.length)i--;if(i>=0&&i<c.length)c[i]++;});return c;}
+function hexbin(ctx,f,xs,ys,X,Y,R,cfn){const S3=Math.sqrt(3),map=new Map();let mx=0;
+  for(let i=0;i<xs.length;i++){const px=X(xs[i])-f.l,py=Y(ys[i])-f.t;const q=(S3/3*px-py/3)/R,r=(2/3*py)/R,x=q,z=r,y=-x-z;let rx=Math.round(x),ry=Math.round(y),rz=Math.round(z);const dx=Math.abs(rx-x),dy=Math.abs(ry-y),dz=Math.abs(rz-z);if(dx>dy&&dx>dz)rx=-ry-rz;else if(dy<=dz)rz=-rx-ry;const key=rx+','+rz;const v=(map.get(key)||0)+1;map.set(key,v);if(v>mx)mx=v;}
+  ctx.save();ctx.beginPath();ctx.rect(f.l,f.t,f.r-f.l,f.b-f.t);ctx.clip();const lm=Math.log1p(mx);
+  map.forEach((v,key)=>{const[q,r]=key.split(',').map(Number);const cx=f.l+R*S3*(q+r/2),cy=f.t+R*1.5*r;ctx.fillStyle=cfn(Math.log1p(v)/lm);ctx.beginPath();for(let k=0;k<6;k++){const a=Math.PI/180*(60*k-30);const x=cx+R*Math.cos(a),y=cy+R*Math.sin(a);k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();ctx.fill();});ctx.restore();return mx;}
+function endLabels(ctx,P,items,x){items.sort((a,b)=>a.y-b.y);for(let k=1;k<items.length;k++)if(items[k].y-items[k-1].y<16)items[k].y=items[k-1].y+16;ctx.font=P.bold;ctx.textAlign='left';ctx.textBaseline='middle';items.forEach(e=>{ctx.fillStyle=e.c;ctx.fillText(e.t,x,e.y);});}
+function squarify(items,x,y,w,h){const total=items.reduce((a,b)=>a+b.v,0),sc=w*h/total;const it=items.map(d=>({...d,a:d.v*sc}));const out=[];let rect={x,y,w,h},row=[],i=0;
+ const worst=(r,len)=>{const s=r.reduce((a,b)=>a+b.a,0);let mx=-1/0,mn=1/0;r.forEach(q=>{mx=Math.max(mx,q.a);mn=Math.min(mn,q.a);});return Math.max(len*len*mx/(s*s),s*s/(len*len*mn));};
+ const lay=(r,R)=>{const s=r.reduce((a,b)=>a+b.a,0);if(R.w>=R.h){const cw=s/R.h;let yy=R.y;r.forEach(q=>{const hh=q.a/cw;out.push({...q,x:R.x,y:yy,w:cw,h:hh});yy+=hh;});return{x:R.x+cw,y:R.y,w:R.w-cw,h:R.h};}const rh=s/R.w;let xx=R.x;r.forEach(q=>{const ww=q.a/rh;out.push({...q,x:xx,y:R.y,w:ww,h:rh});xx+=ww;});return{x:R.x,y:R.y+rh,w:R.w,h:R.h-rh};};
+ while(i<it.length){const len=Math.min(rect.w,rect.h);if(!row.length||worst(row.concat(it[i]),len)<=worst(row,len)){row.push(it[i]);i++;}else{rect=lay(row,rect);row=[];}}if(row.length)lay(row,rect);return out;}
+const F=(w,h,l=58,r=22,t=46,b=48)=>({l,r:w-r,t,b:h-b});
+
+/* ================= DATA ================= */
+// L11a notebook data
+const NX=[5,5,5,10,10,30,30,20,25,40];
+const BORO=['Manhattan','Brooklyn','Bronx','Staten Island','Queens'],BPOP=[1628701,2582830,1432132,476179,2278906];
+const CATS=['a','b','c','d'],CNT=[9,4,6,7];
+const XL=[7,8,9,11],YL=[9,4,6,7],Y2=[8,5,8,4];
+const DV=[[1,2,3,4,10],[2,3,4,5,6]];
+const PM=['Jan','Feb','Mar','Apr'],PS=[250,300,400,350],PE=[200,220,250,300];
+// L11b-style df
+const DEPTS=['Sales','IT','HR','Marketing'],GEN=['Male','Female'];
+const DF=(()=>{const r=rng(42),n=normal(r);const rows=[];for(let i=0;i<1000;i++){const g=r()<.5?0:1;const d=Math.floor(r()*4);const age=Math.max(18,Math.round(35+10*n()));const exp=Math.max(1,Math.min(40,Math.round((age-22)*.7+3*n())));const sal=32000+1500*exp+[0,9000,-3000,2000][d]+8000*n();const ht=g===0?177+7*n():164+6*n();const wt=70+.95*(ht-170)+9*n();const perf=1+9*r();rows.push({age,exp,sal,ht,wt,perf,g,d});}return rows;})();
+const D=DF.slice(0,200);
+const col=(rows,k)=>rows.map(o=>o[k]);
+const grp=(rows,by)=>by==='none'?[{name:'all',rows}]:by==='gender'?GEN.map((n,i)=>({name:n,rows:rows.filter(o=>o.g===i)})):DEPTS.map((n,i)=>({name:n,rows:rows.filter(o=>o.d===i)}));
+// earlier datasets
+const REG=['North','South','East','West','Central','Coastal','Mountain'];
+const R25=[4.2,3.1,5.6,2.4,3.8,4.9,1.7], R26=[4.6,3.0,6.3,2.9,3.5,5.4,2.2];
+const SERV=['Compute','Storage','Database','Networking','ML','Other'];
+const SPEND=SERV.map((s,i)=>Array.from({length:12},(_,m)=>[42+.5*m,18+.2*m,15.5,13+.2*m,4*1.22**m,6][i]));
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const mlab=t=>MON[t%12]+' '+(25+Math.floor(t/12));
+const APPS=(()=>{const r=rng(5),n=normal(r);const f=[t=>200000*1.06**t,t=>2000*1.25**t,t=>50000+8000*t,t=>150000*(1+.35*Math.sin(2*Math.PI*(t-3)/12))];return['Ledgerly','Sproutly','Tallyo','Mapsy'].map((name,i)=>({name,v:Array.from({length:24},(_,t)=>f[i](t)*(1+.02*n()))}));})();
+const HN=8000;
+const H=(()=>{const r=rng(21),n=normal(r);const size=[],price=[],age=[],rooms=[];for(let i=0;i<HN;i++){const s=Math.min(320,Math.max(35,30+Math.exp(4.25+.45*n())));const a=r()*80,d=1+r()*24;size.push(s);age.push(a);rooms.push(Math.min(7,Math.max(1,Math.round(s/38+.7*n()))));price.push(Math.min(990,Math.max(40,60+2.7*s-1.3*a-7*d+48*n())));}return{size,price,age,rooms};})();
+
+/* ================= LESSONS ================= */
+const P1={part:1,lib:'matplotlib',data:'Data: the small lists from the L11a notebook, so you can match each chart to the cell you ran.'};
+const P2={part:2,lib:'seaborn',data:'Data: a 200-row df with the same columns as the L11b notebook (age, salary, height, weight, gender, department, experience, performance_score). Values here are simulated with realistic links, such as salary rising with experience, so the plots have something to show.'};
+const P3={part:3,lib:'matplotlib',data:''};
+const PARTS={1:{name:'Part 1 · Matplotlib & pandas',sub:'The foundation (L11a)'},2:{name:'Part 2 · Seaborn',sub:'Statistical plots (L11b)'},3:{name:'Part 3 · Going further',sub:'Specialist charts'}};
+const L=[];const add=(base,o)=>L.push({...base,...o});
+const TF=v=>v?'True':'False';
+
+/* ---------- PART 1 ---------- */
+add(P1,{id:'line',name:'Line plot',fn:'plt.plot()',lvl:'Basic',q:'Change over time',
+ what:'Connects points in x order. The simplest matplotlib chart and the base for most others.',
+ pro:['One line of code','Shows trends and turning points clearly','Several series share one axes easily'],
+ con:['Implies continuity between points, even when there is none','More than ~5 lines becomes spaghetti'],
+ use:'x is ordered and continuous: time, distance, a dose.',avoid:'x is unordered categories (use bars).',
+ trap:'plt.plot() joins points in the order you pass them. If x isn\'t sorted, the line zig-zags back and forth.',
+ controls:[{t:'check',k:'two',label:'Add a second line',v:true},{t:'check',k:'shuf',label:'Pass x unsorted',v:false}],
+ code:s=>`import matplotlib.pyplot as plt\n\nx = ${s.shuf?'[9, 7, 11, 8]':'[7, 8, 9, 11]'}\ny = ${s.shuf?'[6, 9, 7, 4]':'[9, 4, 6, 7]'}\nplt.plot(x, y)${s.two?`\n\ny2 = [8, 5, 8, 4]\nplt.plot(${s.shuf?'[7, 8, 9, 11]':'x'}, y2)`:''}\nplt.show()`,
+ ai:'Using matplotlib, plot y = [9, 4, 6, 7] against x = [7, 8, 9, 11] as a line chart, add a second series y2 = [8, 5, 8, 4], and label both lines with a legend.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(6.8,11.2,f.l,f.r),Y=lin(3.7,9.3,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(7,11,4),yt:ticks(4,9,5),box:true,noYgrid:true});
+  const xs=s.shuf?[9,7,11,8]:XL,ys=s.shuf?[6,9,7,4]:YL;ctx.strokeStyle=P.s[0];ctx.lineWidth=2;path(ctx,xs,ys,X,Y);ctx.stroke();
+  if(s.two){ctx.strokeStyle=P.s[1];path(ctx,XL,Y2,X,Y);ctx.stroke();}
+  if(s.shuf)note(ctx,P,'Unsorted x: the line doubles back on itself',f.l,f.t-10,P.bad);}});
+add(P1,{id:'style',name:'Styling lines',fn:"plt.plot(x, y, 'go--')",lvl:'Basic',q:'Layout & style',
+ what:'Control color, marker, line style, width and transparency, either with keyword arguments or a short format string.',
+ pro:['Separate series without relying on color alone','Format strings are quick to type','alpha lets overlapping lines show through'],
+ con:['Format strings are cryptic to new readers','Too many styles at once looks busy'],
+ use:'Distinguishing series, marking the actual data points, de-emphasizing context lines.',avoid:'Decorating for its own sake: every style choice should encode something.',
+ trap:'Markers show where the real observations are. A plain line hides that there are only 4 data points here.',
+ controls:[{t:'select',k:'c',label:'color',opts:[['b','blue  b'],['g','green  g'],['r','red  r'],['k','black  k']],v:'g'},{t:'select',k:'m',label:'marker',opts:[['','none'],['o','circle  o'],['^','triangle  ^'],['s','square  s'],['.','point  .'],['x','x']],v:'o'},{t:'select',k:'ls',label:'linestyle',opts:[['-','solid  -'],['--','dashed  --'],['-.','dash-dot  -.'],[':','dotted  :']],v:'--'},{t:'range',k:'lw',label:'linewidth',min:.5,max:6,step:.5,v:2,fmt:v=>v},{t:'range',k:'ms',label:'markersize',min:2,max:16,step:1,v:10,fmt:v=>v},{t:'range',k:'a',label:'alpha',min:.1,max:1,step:.1,v:1,fmt:v=>(+v).toFixed(1)}],
+ code:s=>{const cn={b:'blue',g:'green',r:'red',k:'black'}[s.c];return `x = [7, 8, 9, 11]\ny = [9, 4, 6, 7]\n\n# Keyword arguments (clear and explicit)\nplt.plot(x, y, color='${cn}', marker='${s.m}', linestyle='${s.ls}',\n         linewidth=${s.lw}, markersize=${s.ms}, alpha=${(+s.a).toFixed(1)})\n\n# The same line with a format string: color + marker + linestyle\nplt.plot(x, y, '${s.c}${s.m}${s.ls}', linewidth=${s.lw}, markersize=${s.ms}, alpha=${(+s.a).toFixed(1)})`;},
+ ai:'In matplotlib, plot y = [9, 4, 6, 7] against x = [7, 8, 9, 11] as a green dashed line with circle markers of size 10, linewidth 2. Show both the keyword-argument version and the format-string version.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(6.8,11.2,f.l,f.r),Y=lin(3.7,9.3,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(7,11,4),yt:ticks(4,9,5),box:true,noYgrid:true});
+  const c={b:P.s[0],g:P.s[2],r:P.s[4],k:P.ink}[s.c];ctx.globalAlpha=+s.a;ctx.strokeStyle=c;ctx.lineWidth=+s.lw;ctx.setLineDash({'-':[],'--':[3.7*s.lw,1.6*s.lw],'-.':[6.4*s.lw,1.6*s.lw,1*s.lw,1.6*s.lw],':':[1*s.lw,1.65*s.lw]}[s.ls]);path(ctx,XL,YL,X,Y);ctx.stroke();ctx.setLineDash([]);
+  if(s.m)XL.forEach((x,i)=>mark(ctx,s.m,X(x),Y(YL[i]),+s.ms*1.2,c));ctx.globalAlpha=1;
+  note(ctx,P,`format string: '${s.c}${s.m}${s.ls}'`,f.r,f.t-10,P.muted,'right');}});
+add(P1,{id:'anatomy',name:'Anatomy of a figure',fn:'plt.title() · plt.xlabel() · plt.legend()',lvl:'Basic',q:'Layout & style',
+ what:'A Figure holds one or more Axes. Titles, labels, limits, ticks and legends are all set on the axes. Tick each option to see which line of code changes what.',
+ pro:['Labels and units make a chart self-explanatory','Limits and ticks focus attention on the range that matters'],
+ con:['Hand-set limits can hide data that falls outside them'],
+ use:'Always: every chart you share needs a title, axis labels and units.',avoid:'Setting xlim without checking that no data is cut off.',
+ trap:'plt.xlim([1, 20]) shrinks the data into a corner. Limits should frame the data, not hide or squash it.',
+ controls:[{t:'check',k:'parts',label:'Name the parts',v:true},{t:'check',k:'title',label:'title',v:true},{t:'check',k:'lab',label:'x/y labels',v:true},{t:'check',k:'leg',label:'legend',v:true},{t:'check',k:'xlim',label:'xlim([1, 20])',v:false},{t:'check',k:'xt',label:'xticks([5, 10, 15])',v:false},{t:'check',k:'wide',label:'figsize=(10, 5)',v:true}],
+ code:s=>[s.wide?'plt.figure(figsize=(10, 5))':'# default figure size is 6.4 x 4.8 inches',"plt.plot(x_line, y_line, label='data-1')",s.title?"plt.title('Line plot of y against x')":null,s.lab?"plt.xlabel('x label')\nplt.ylabel('y label')":null,s.xlim?'plt.xlim([1, 20])':null,s.xt?'plt.xticks([5, 10, 15])':null,s.leg?'plt.legend(loc=1)   # 1 = upper right':null,'plt.show()'].filter(Boolean).join('\n'),
+ ai:'Make a matplotlib line chart of y_line against x_line on a 10×5 inch figure with a descriptive title, x and y axis labels with units, and a legend in the upper right.',
+ draw(ctx,w,h,P,s){const fw=s.wide?Math.min(w-24,(h-24)*2):Math.min(w-24,(h-24)*1.333);const fh=s.wide?fw/2:fw/1.333;const fx=(w-fw)/2,fy=(h-fh)/2;
+  ctx.fillStyle=P.code;ctx.fillRect(fx,fy,fw,fh);ctx.strokeStyle=P.line;ctx.setLineDash([5,4]);ctx.strokeRect(fx,fy,fw,fh);ctx.setLineDash([]);
+  const f={l:fx+(s.lab?64:44),r:fx+fw-18,t:fy+(s.title?44:20),b:fy+fh-(s.lab?50:30)};ctx.fillStyle=P.surface;ctx.fillRect(f.l,f.t,f.r-f.l,f.b-f.t);
+  const xd=s.xlim?[1,20]:[6.8,11.2];const X=lin(xd[0],xd[1],f.l,f.r),Y=lin(3.7,9.3,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:s.xt?[5,10,15]:ticks(xd[0],xd[1],s.xlim?4:4),yt:ticks(4,9,5),box:true,noYgrid:true});
+  ctx.strokeStyle=P.s[0];ctx.lineWidth=2;path(ctx,XL,YL,X,Y);ctx.stroke();
+  if(s.title){ctx.fillStyle=P.ink;ctx.font=P.title;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('Line plot of y against x',(f.l+f.r)/2,f.t-10);}
+  if(s.lab){ctx.fillStyle=P.ink;ctx.font=P.sans;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('x label',(f.l+f.r)/2,f.b+24);ctx.save();ctx.translate(fx+16,(f.t+f.b)/2);ctx.rotate(-Math.PI/2);ctx.textBaseline='middle';ctx.fillText('y label',0,0);ctx.restore();}
+  if(s.leg){const lx=f.r-86,ly=f.t+10;ctx.fillStyle=P.surface;ctx.strokeStyle=P.line;ctx.fillRect(lx,ly,76,24);ctx.strokeRect(lx,ly,76,24);ctx.fillStyle=P.s[0];ctx.fillRect(lx+8,ly+11,16,2.5);ctx.fillStyle=P.ink;ctx.font=P.sans;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('data-1',lx+30,ly+12);}
+  if(s.parts){const tag=(t,x,y,al='left')=>{ctx.font='600 11px "IBM Plex Mono", monospace';const tw=ctx.measureText(t).width+10;const bx=al==='left'?x:x-tw;ctx.fillStyle=P.accent2;ctx.fillRect(bx,y-9,tw,18);ctx.fillStyle='#ffffff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+5,y);};
+   tag('Figure',fx+4,fy+12);tag('Axes',f.l+6,f.b-14);if(s.title)tag('title',(f.l+f.r)/2+100,f.t-18);if(s.lab){tag('xlabel',(f.l+f.r)/2+36,f.b+32);tag('ylabel',fx+4,(f.t+f.b)/2-34);}if(s.leg)tag('legend',f.r-90,f.t+22,'right');tag('tick labels',f.l+8,f.b+14);tag('line (Line2D)',X(9)+6,Y(6)+16);}}});
+add(P1,{id:'bar',name:'Bar & horizontal bar',fn:'plt.bar() · plt.barh()',lvl:'Basic',q:'Compare',
+ what:'One bar per category; bar length encodes the value. barh() turns the bars sideways.',
+ pro:['Length is the most accurately read visual encoding','Familiar to every audience','barh() keeps long labels readable'],
+ con:['Cluttered beyond about 12–15 categories','Only shows one number per category, not the spread'],
+ use:'Comparing a value across categories. Use barh() for many categories or long names.',avoid:'The value axis can\'t start at zero, or the categories are really a continuous variable.',
+ trap:'Bars must start at zero. Sorting by value usually helps; keep the natural order only when it means something (months, ratings).',
+ controls:[{t:'seg',k:'o',label:'Orientation',opts:[['v','plt.bar'],['h','plt.barh']],v:'h'},{t:'check',k:'sort',label:'Sort by value',v:false},{t:'select',k:'c',label:'color',opts:[['C0','default blue'],['orange','orange']],v:'orange'}],
+ code:s=>`categories = ['a', 'b', 'c', 'd']\ncounts = [9, 4, 6, 7]${s.sort?`\n\n# sort pairs by count (largest first)\npairs = sorted(zip(categories, counts), key=lambda t: t[1], reverse=True)\ncategories, counts = zip(*pairs)`:''}\n\nplt.${s.o==='v'?'bar':'barh'}(categories, counts${s.c==='orange'?", color='orange'":''})${s.o==='h'&&s.sort?'\nplt.gca().invert_yaxis()   # put the largest bar on top':''}`,
+ ai:'Make a horizontal bar chart in matplotlib of counts = [9, 4, 6, 7] for categories a–d, sorted with the largest at the top, value labels at the end of each bar, and the x-axis starting at zero.',
+ draw(ctx,w,h,P,s){const c=s.c==='orange'?P.s[1]:P.s[0];let idx=[0,1,2,3];if(s.sort)idx.sort((a,b)=>CNT[b]-CNT[a]);
+  if(s.o==='v'){const f=F(w,h);const Y=lin(0,9.45,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,9,9),box:true,noYgrid:true});const{band,c:cx}=catX(f,4);idx.forEach((i,k)=>{ctx.fillStyle=c;ctx.fillRect(cx(k)-band*.4,Y(CNT[i]),band*.8,f.b-Y(CNT[i]));});catLabels(ctx,P,f,idx.map(i=>CATS[i]),cx);}
+  else{const f=F(w,h,40,22,30,40);const X=lin(0,9.45,f.l,f.r);axes(ctx,f,{P,x:X,xt:ticks(0,9,9),box:true});const band=(f.b-f.t)/4;idx.forEach((i,k)=>{const cy=f.t+band*(k+.5);ctx.fillStyle=c;ctx.fillRect(f.l,cy-band*.4,X(CNT[i])-f.l,band*.8);ctx.fillStyle=P.muted;ctx.font=P.sans;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(CATS[i],f.l-8,cy);});}}});
+add(P1,{id:'scatter',name:'Scatter plot',fn:'plt.scatter()',lvl:'Basic',q:'Relationship',
+ what:'Each observation is a point at (x, y). Different markers or colors separate series.',
+ pro:['Shows form, direction and outliers of a relationship','Every observation stays visible'],
+ con:['Points overlap when there are thousands','Only two variables at a time without extra encodings'],
+ use:'Looking for a relationship between two numeric variables.',avoid:'One variable is categorical, or you have so many points that they form a solid blob.',
+ trap:'Color and marker should separate series that mean different things. A legend is required as soon as there are two.',
+ controls:[{t:'select',k:'m',label:'Series 2 marker',opts:[['x',"'x'"],['^',"'^'"],['s',"'s'"],['o',"'o'"]],v:'x'},{t:'range',k:'sz',label:'s (marker area)',min:10,max:300,step:10,v:60,fmt:v=>v},{t:'check',k:'leg',label:'legend',v:true}],
+ code:s=>`x = [7, 8, 9, 11]\ny = [9, 4, 6, 7]\ny2 = [8, 5, 8, 4]\n\nplt.scatter(x, y, s=${s.sz}, label='Series 1')\nplt.scatter(x, y2, s=${s.sz}, label='Series 2', marker='${s.m}')${s.leg?'\nplt.legend()':''}`,
+ ai:'Make a matplotlib scatter plot of two series (y and y2) against x, using a circle marker for series 1 and an x marker for series 2, with a legend and axis labels.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(6.8,11.2,f.l,f.r),Y=lin(3.7,9.3,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(7,11,4),yt:ticks(4,9,5),box:true,noYgrid:true});const sz=Math.sqrt(+s.sz)*1.25;
+  XL.forEach((x,i)=>{mark(ctx,'o',X(x),Y(YL[i]),sz,P.s[0]);mark(ctx,s.m,X(x),Y(Y2[i]),sz,P.s[1],2);});
+  if(s.leg){ctx.font=P.sans;ctx.textBaseline='middle';ctx.textAlign='left';const lx=f.r-110,ly=f.t+16;mark(ctx,'o',lx,ly,10,P.s[0]);ctx.fillStyle=P.ink;ctx.fillText('Series 1',lx+12,ly);mark(ctx,s.m,lx,ly+20,10,P.s[1],2);ctx.fillStyle=P.ink;ctx.fillText('Series 2',lx+12,ly+20);}}});
+add(P1,{id:'hist',name:'Histogram',fn:'plt.hist()',lvl:'Basic',q:'Distribution',
+ what:'Splits the range of one numeric variable into bins and draws how many values fall in each.',
+ pro:['Shows shape: peaks, skew, gaps','Works for any amount of data'],
+ con:['The picture depends on the number of bins','With very few values, the shape is mostly noise'],
+ use:'First look at one numeric variable.',avoid:'Tiny samples like these 10 values (show the points instead), or comparing many groups.',
+ trap:'Matplotlib uses 10 bins by default. Move the slider: with only 10 values, each bin choice tells a different story.',
+ controls:[{t:'range',k:'bins',label:'bins',min:2,max:15,step:1,v:10,fmt:v=>v},{t:'check',k:'edge',label:"edgecolor='black'",v:true},{t:'check',k:'pts',label:'Show the 10 raw values',v:true}],
+ code:s=>`x = [5, 5, 5, 10, 10, 30, 30, 20, 25, 40]\nplt.hist(x${+s.bins!==10?`, bins=${s.bins}`:''}${s.edge?", edgecolor='black'":''})\nplt.xlabel('value'); plt.ylabel('count')`,
+ ai:'Plot a histogram in matplotlib of x = [5, 5, 5, 10, 10, 30, 30, 20, 25, 40] with black bin edges, and make a 1×3 grid of the same data with 3, 6 and 12 bins so I can compare.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const k=+s.bins;const edges=range(5,40,k+1);const c=hist(NX,edges);const ym=Math.max(...c)*1.1;const X=lin(3.25,41.75,f.l,f.r),Y=lin(0,ym,f.b,f.t);
+  axes(ctx,f,{P,x:X,y:Y,xt:ticks(5,40,7),yt:ticks(0,ym,Math.min(5,Math.ceil(ym))).filter(v=>Number.isInteger(v)),box:true,noYgrid:true,yl:'count'});
+  c.forEach((v,i)=>{const x0=X(edges[i]),x1=X(edges[i+1]);ctx.fillStyle=P.s[0];ctx.fillRect(x0,Y(v),x1-x0,f.b-Y(v));if(s.edge){ctx.strokeStyle=P.ink;ctx.lineWidth=1;ctx.strokeRect(x0,Y(v),x1-x0,f.b-Y(v));}});
+  if(s.pts){const seen={};NX.forEach(v=>{seen[v]=(seen[v]||0)+1;mark(ctx,'o',X(v),f.b-8-(seen[v]-1)*9,7,P.accent2);});}
+  note(ctx,P,`bin width ${((40-5)/k).toFixed(1)}`,f.r,f.t-10,P.muted,'right');}});
+add(P1,{id:'pie',name:'Pie chart',fn:'plt.pie()',lvl:'Basic',q:'Composition',
+ what:'A circle split into slices, one per part of a whole. autopct prints the percentages.',
+ pro:['Instantly reads as "parts of a whole"','Fine for 2–3 very different shares'],
+ con:['Angles and areas are judged far less accurately than lengths','Near-equal slices can\'t be ranked','Breaks down past about 5 slices'],
+ use:'One whole, few parts, one obvious message.',avoid:'Comparing parts precisely, or comparing two pies.',
+ trap:'Rank Manhattan and Bronx by eye, then tick "Show as sorted bar chart". Always add autopct so readers aren\'t guessing.',
+ controls:[{t:'check',k:'pct',label:"autopct='%1.1f%%'",v:true},{t:'check',k:'start',label:'startangle=90, clockwise',v:false},{t:'check',k:'ex',label:'explode largest slice',v:false},{t:'check',k:'bar',label:'Show as sorted bar chart',v:false}],
+ code:s=>s.bar?`values = [1628701, 2582830, 1432132, 476179, 2278906]\nlabels = ['Manhattan', 'Brooklyn', 'Bronx', 'Staten Island', 'Queens']\n\npop = pd.Series(values, index=labels).sort_values()\npop.plot(kind='barh')\nplt.xlabel('Population')`:`values = [1628701, 2582830, 1432132, 476179, 2278906]\nlabels = ['Manhattan', 'Brooklyn', 'Bronx', 'Staten Island', 'Queens']\n\nplt.pie(values, labels=labels${s.pct?", autopct='%1.1f%%'":''}${s.start?', startangle=90, counterclock=False':''}${s.ex?',\n        explode=[0, 0.1, 0, 0, 0]':''})\nplt.axis('equal')`,
+ ai:'Make a matplotlib pie chart of NYC borough populations with percentage labels (one decimal), starting at 12 o\'clock and going clockwise. Also make a sorted horizontal bar chart of the same data for comparison.',
+ draw(ctx,w,h,P,s){if(s.bar){const f=F(w,h,100,30,40,40);const idx=[0,1,2,3,4].sort((a,b)=>BPOP[b]-BPOP[a]);const X=lin(0,2.8e6,f.l,f.r);axes(ctx,f,{P,x:X,xt:ticks(0,2.8e6,5),xgrid:true});const band=(f.b-f.t)/5;
+   idx.forEach((i,k)=>{const cy=f.t+band*(k+.5);ctx.fillStyle=P.s[0];ctx.fillRect(f.l,cy-band*.35,X(BPOP[i])-f.l,band*.7);ctx.fillStyle=P.ink;ctx.font=P.sans;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(BORO[i],f.l-8,cy);ctx.font=P.bold;ctx.textAlign='left';ctx.fillText(short(BPOP[i]),X(BPOP[i])+6,cy);});return;}
+  const r=Math.min(w*.24,h*.34);pie(ctx,P,w/2,h/2+6,r,BPOP,BORO,P.s,{pct:s.pct,start:s.start?-Math.PI/2:0,cw:s.start,explode:s.ex?[0,1,0,0,0]:null});}});
+add(P1,{id:'box',name:'Box plot',fn:'plt.boxplot()',lvl:'Intermediate',q:'Distribution',
+ what:'Summarizes a distribution with five numbers: the box spans Q1 to Q3, the line is the median, whiskers reach the furthest points within 1.5 × IQR, and anything beyond is an outlier.',
+ pro:['Compact; many groups fit side by side','Robust to extreme values','Flags outliers automatically'],
+ con:['Hides the shape: one peak and two peaks can look the same','Readers need to know how whiskers are defined'],
+ use:'Comparing medians and spread across groups.',avoid:'Shape matters, or the audience hasn\'t learned to read boxes.',
+ trap:'Add an outlier (90): the box barely moves, but the mean would jump from 18 to 25. Boxes are robust, which can also hide what\'s going on.',
+ controls:[{t:'check',k:'ann',label:'Label the parts',v:true},{t:'check',k:'pts',label:'Overlay raw points',v:false},{t:'check',k:'out',label:'Add an outlier (90)',v:false}],
+ code:s=>`x = [5, 5, 5, 10, 10, 30, 30, 20, 25, 40]${s.out?'\nx.append(90)':''}\nplt.boxplot(x)${s.pts?"\nplt.scatter([1] * len(x), x, alpha=0.5, zorder=3)":''}`,
+ ai:'Make a matplotlib box plot of x = [5, 5, 5, 10, 10, 30, 30, 20, 25, 40], overlay the raw points, and annotate Q1, the median, Q3 and the whiskers.',
+ draw(ctx,w,h,P,s){const d=s.out?NX.concat([90]):NX;const f=F(w,h);const ym=s.out?95:43;const Y=lin(0,ym,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,ym,6),box:true,noYgrid:true});const cx=f.l+(f.r-f.l)*.38,bw=Math.min(120,(f.r-f.l)*.25);
+  const b=drawBox(ctx,P,cx,bw,Y,d,P.surface,1);ctx.strokeStyle=P.s[1];ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx-bw/2,Y(b.md));ctx.lineTo(cx+bw/2,Y(b.md));ctx.stroke();
+  if(s.pts){d.forEach((v,i)=>mark(ctx,'o',cx+((i%3)-1)*8,Y(v),7,P.s[0]));}
+  if(s.ann){const lx=cx+bw/2+22;const lab=(t,v)=>{ctx.strokeStyle=P.muted;ctx.lineWidth=1;ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(cx+bw/2+4,Y(v));ctx.lineTo(lx-4,Y(v));ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=P.ink;ctx.font=P.sans;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,lx,Y(v));};
+   lab(`Upper whisker = ${fmt(b.hi,2)}`,b.hi);lab(`Q3 (75th pct) = ${fmt(b.q3,2)}`,b.q3);lab(`Median = ${fmt(b.md,2)}`,b.md);lab(`Q1 (25th pct) = ${fmt(b.q1,2)}`,b.q1);lab(`Lower whisker = ${fmt(b.lo,2)}`,b.lo);if(b.out.length)lab('Outlier: beyond Q3 + 1.5 × IQR',b.out[0]);
+   note(ctx,P,`IQR = Q3 − Q1 = ${fmt(b.q3-b.q1,2)}   ·   mean = ${fmt(mean(d),1)}`,f.l+8,f.t-10,P.muted);}}});
+add(P1,{id:'mviolin',name:'Violin plot',fn:'plt.violinplot()',lvl:'Intermediate',q:'Distribution',
+ what:'A smoothed density mirrored on both sides, so you see the shape of each group. Matplotlib draws it with showextrema bars by default.',
+ pro:['Shows the shape that a box plot hides','showmeans / showmedians add summaries'],
+ con:['Smoothing invents shape when there are few points','Width depends on bw_method'],
+ use:'Comparing distribution shapes of a few groups with reasonable sample sizes.',avoid:'Groups with only a handful of values, like these two lists of 5.',
+ trap:'Each group here has just 5 values. Change bw_method and watch the "shape" change completely: with so little data, it is mostly invented.',
+ controls:[{t:'check',k:'means',label:'showmeans',v:true},{t:'check',k:'meds',label:'showmedians',v:false},{t:'range',k:'bw',label:'bw_method',min:.2,max:1.5,step:.05,v:.75,fmt:v=>(+v).toFixed(2)},{t:'check',k:'pts',label:'Overlay raw points',v:false}],
+ code:s=>`data_v = [[1, 2, 3, 4, 10], [2, 3, 4, 5, 6]]\nplt.violinplot(data_v, showmeans=${TF(s.means)}, showmedians=${TF(s.meds)}, bw_method=${(+s.bw).toFixed(2)})\n# default bw_method is 'scott' (≈ 0.72 for 5 points)`,
+ ai:'Make a matplotlib violin plot of two groups, [1, 2, 3, 4, 10] and [2, 3, 4, 5, 6], showing means and medians, and overlay the raw data points so readers can see how few there are.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const Y=lin(0,11,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,10,5),box:true,noYgrid:true});const{band,c}=catX(f,2);
+  DV.forEach((a,i)=>{const cx=c(i),mw=band*.25;const bw=sd(a)*(+s.bw);const ys=range(Math.min(...a),Math.max(...a),100),k=kde(a,bw,ys),m=Math.max(...k);
+   ctx.fillStyle=P.s[0];ctx.globalAlpha=.3;ctx.beginPath();ys.forEach((y,j)=>{const x=cx+k[j]/m*mw;j?ctx.lineTo(x,Y(y)):ctx.moveTo(x,Y(y));});for(let j=ys.length-1;j>=0;j--)ctx.lineTo(cx-k[j]/m*mw,Y(ys[j]));ctx.closePath();ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=P.s[0];ctx.lineWidth=1;ctx.stroke();
+   ctx.strokeStyle=P.s[0];ctx.lineWidth=1.5;ctx.beginPath();const mn=Math.min(...a),mx=Math.max(...a);ctx.moveTo(cx,Y(mn));ctx.lineTo(cx,Y(mx));[mn,mx].forEach(v=>{ctx.moveTo(cx-mw*.4,Y(v));ctx.lineTo(cx+mw*.4,Y(v));});
+   if(s.means){const v=mean(a);ctx.moveTo(cx-mw*.4,Y(v));ctx.lineTo(cx+mw*.4,Y(v));}ctx.stroke();
+   if(s.meds){const v=quant(a,.5);ctx.strokeStyle=P.s[1];ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx-mw*.4,Y(v));ctx.lineTo(cx+mw*.4,Y(v));ctx.stroke();}
+   if(s.pts)a.forEach(v=>mark(ctx,'o',cx+mw*.7,Y(v),7,P.accent2));ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(i+1,cx,f.b+6);});
+  if(s.means)note(ctx,P,'Middle bar: mean'+(s.meds?' · orange: median':''),f.r,f.t-10,P.muted,'right');}});
+add(P1,{id:'step',name:'Step plot',fn:'plt.step()',lvl:'Intermediate',q:'Change over time',
+ what:'Draws values as flat steps instead of sloped lines. The where argument decides whether each step happens before, at the middle of, or after each x.',
+ pro:['Honest for values that change suddenly and then hold (prices, stock levels, tariffs)','Makes discrete jumps obvious'],
+ con:['Wrong where= shifts every change by one interval','Looks odd for continuous measurements'],
+ use:'Values that stay constant until the next change: inventory, interest rates, cumulative counts.',avoid:'Continuously changing measurements like temperature.',
+ trap:"Switch between 'pre' and 'post' with the line overlay on: the same data says the change happened at different times.",
+ controls:[{t:'seg',k:'wh',label:'where',opts:[['pre',"'pre'"],['mid',"'mid'"],['post',"'post'"]],v:'mid'},{t:'check',k:'ln',label:'Overlay plt.plot()',v:true}],
+ code:s=>`x_line = [7, 8, 9, 11]\ny_line = [9, 4, 6, 7]\nplt.step(x_line, y_line, where='${s.wh}', label='step')${s.ln?"\nplt.plot(x_line, y_line, 'o--', alpha=0.5, label='line')\nplt.legend()":''}`,
+ ai:"Plot y_line against x_line with plt.step using where='post' (each value holds until the next change), mark the actual data points with dots, and label the axes.",
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(6.8,11.2,f.l,f.r),Y=lin(3.7,9.3,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:[7,8,9,10,11],yt:ticks(4,9,5),box:true,noYgrid:true,xgrid:true});
+  ctx.strokeStyle=P.s[0];ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(X(XL[0]),Y(YL[0]));for(let i=1;i<XL.length;i++){if(s.wh==='pre'){ctx.lineTo(X(XL[i-1]),Y(YL[i]));ctx.lineTo(X(XL[i]),Y(YL[i]));}else if(s.wh==='post'){ctx.lineTo(X(XL[i]),Y(YL[i-1]));ctx.lineTo(X(XL[i]),Y(YL[i]));}else{const m=(XL[i-1]+XL[i])/2;ctx.lineTo(X(m),Y(YL[i-1]));ctx.lineTo(X(m),Y(YL[i]));ctx.lineTo(X(XL[i]),Y(YL[i]));}}ctx.stroke();
+  if(s.ln){ctx.globalAlpha=.5;ctx.strokeStyle=P.s[1];ctx.setLineDash([6,4]);ctx.lineWidth=2;path(ctx,XL,YL,X,Y);ctx.stroke();ctx.setLineDash([]);XL.forEach((x,i)=>mark(ctx,'o',X(x),Y(YL[i]),9,P.s[1]));ctx.globalAlpha=1;}}});
+add(P1,{id:'subplots',name:'Subplots',fn:'fig, ax = plt.subplots()',lvl:'Intermediate',q:'Layout & style',
+ what:'Puts several axes in one figure. You draw on each axes object (ax[0], ax[1] …) instead of using plt directly.',
+ pro:['Compare related charts side by side','Shared axes make comparisons fair','The object-oriented style scales to complex figures'],
+ con:['Indexing changes with the grid shape: ax[0] vs ax[0, 0]','Small panels get crowded labels'],
+ use:'Showing related views of the same data, or the same chart for several groups.',avoid:'Unrelated charts that would be clearer as separate figures.',
+ trap:'With a 2×2 grid, ax is 2-D: ax[0] is a whole row and ax[0].plot() fails. Use ax[0, 0]. Turn off sharey and compare the y-axes.',
+ controls:[{t:'seg',k:'g',label:'Grid',opts:[['1x2','1 × 2'],['2x1','2 × 1'],['2x2','2 × 2']],v:'1x2'},{t:'check',k:'sy',label:'sharey=True',v:false}],
+ code:s=>{const two=s.g==='2x2';const [r,c]=s.g.split('x');const a=i=>two?`ax[${Math.floor(i/2)}, ${i%2}]`:`ax[${i}]`;return `fig, ax = plt.subplots(${r}, ${c}${s.sy?', sharey=True':''}${two?', figsize=(9, 6)':''})\n\n${a(0)}.step(x_line, y_line, where='mid')\n${a(0)}.set_title('Step Plot')\n${a(1)}.plot(x_line, y_line)\n${a(1)}.set_title('Line Plot')${two?`\n${a(2)}.scatter(x_line, y2)\n${a(2)}.set_title('Scatter')\n${a(3)}.bar(categories, counts)\n${a(3)}.set_title('Bar')`:''}\n\nplt.tight_layout()   # stop titles and labels overlapping\nplt.show()`;},
+ ai:"Create a matplotlib figure with plt.subplots(1, 2): a step plot of y_line vs x_line on the left and a line plot on the right, each with its own title, shared y-axis, and tight_layout.",
+ draw(ctx,w,h,P,s){const [R,C]=s.g.split('x').map(Number);const n=R*C,gap=24,pw=(w-gap*(C-1)-16)/C,ph=(h-gap*(R-1)-16)/R;
+  const kinds=['step','line','scatter','bar'],titles=['Step Plot','Line Plot','Scatter','Bar'];
+  for(let i=0;i<n;i++){const ox=8+(i%C)*(pw+gap),oy=8+Math.floor(i/C)*(ph+gap);const f={l:ox+40,r:ox+pw-8,t:oy+40,b:oy+ph-28};
+   const idx=n===4?`ax[${Math.floor(i/2)}, ${i%2}]`:`ax[${i}]`;ctx.fillStyle=P.ink;ctx.font=P.title;ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillText(titles[i],(f.l+f.r)/2,f.t-10);ctx.fillStyle=P.accent2;ctx.font=P.mono;ctx.textAlign='left';ctx.fillText(idx,ox+2,oy+12);
+   const k=kinds[i];let yd=s.sy?[0,10]:(k==='bar'?[0,9.5]:[3.7,9.3]);if(s.sy&&k!=='bar')yd=[0,10];const X=k==='bar'?null:lin(6.8,11.2,f.l,f.r),Y=lin(yd[0],yd[1],f.b,f.t);
+   axes(ctx,f,{P,x:X||(v=>v),y:Y,xt:X?[7,9,11]:[],yt:ticks(yd[0],yd[1],4),box:true,noYgrid:true});
+   if(k==='step'){ctx.strokeStyle=P.s[0];ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(XL[0]),Y(YL[0]));for(let j=1;j<4;j++){const m=(XL[j-1]+XL[j])/2;ctx.lineTo(X(m),Y(YL[j-1]));ctx.lineTo(X(m),Y(YL[j]));ctx.lineTo(X(XL[j]),Y(YL[j]));}ctx.stroke();}
+   if(k==='line'){ctx.strokeStyle=P.s[0];ctx.lineWidth=2;path(ctx,XL,YL,X,Y);ctx.stroke();}
+   if(k==='scatter')XL.forEach((x,j)=>mark(ctx,'o',X(x),Y(Y2[j]),8,P.s[0]));
+   if(k==='bar'){const{band,c}=catX(f,4);CNT.forEach((v,j)=>{ctx.fillStyle=P.s[0];ctx.fillRect(c(j)-band*.35,Y(v),band*.7,f.b-Y(v));});catLabels(ctx,P,f,CATS,c);}}}});
+add(P1,{id:'pandas',name:'Plotting from pandas',fn:"df.plot(kind='…')",lvl:'Basic',q:'Quick exploration',
+ what:'Every DataFrame has a .plot() method that calls matplotlib for you. Change kind to switch chart type without rewriting code.',
+ pro:['One line from a DataFrame to a chart','Column names become labels and legends automatically','Returns a matplotlib Axes, so you can keep customizing'],
+ con:['Less control than calling matplotlib directly','Easy to produce a chart type that makes no sense for the data'],
+ use:'Fast exploration while you work with a DataFrame.',avoid:'Final publication charts that need careful styling.',
+ trap:"kind='hist' on 4 values or kind='scatter' with month names both run without errors, but say nothing useful. pandas won't stop a chart that doesn't fit the data.",
+ controls:[{t:'seg',k:'kind',label:'kind',opts:[['line','line'],['bar','bar'],['barh','barh'],['area','area'],['scatter','scatter'],['hist','hist'],['box','box']],v:'bar'},{t:'check',k:'both',label:'Plot sales and expenses',v:true}],
+ code:s=>{const ys=s.both?"y=['sales', 'expenses']":"y='sales'";const pre=`data = {'month': ['Jan', 'Feb', 'Mar', 'Apr'],\n        'sales': [250, 300, 400, 350],\n        'expenses': [200, 220, 250, 300]}\ndf = pd.DataFrame(data)\n\n`;
+  if(s.kind==='hist')return pre+(s.both?"df[['sales', 'expenses']].plot(kind='hist', alpha=0.5)":"df['sales'].plot(kind='hist')");
+  if(s.kind==='box')return pre+(s.both?"df[['sales', 'expenses']].plot(kind='box')":"df['sales'].plot(kind='box')");
+  if(s.kind==='scatter')return pre+"df.plot(x='month', y='sales', kind='scatter')   # scatter takes one y column"+(s.both?"\n# for two columns, plot twice on the same axes:\n# ax = df.plot(x='month', y='sales', kind='scatter')\n# df.plot(x='month', y='expenses', kind='scatter', color='C1', ax=ax)":'');
+  return pre+`df.plot(x='month', ${ys}, kind='${s.kind}')`;},
+ ai:"From a pandas DataFrame with columns month, sales and expenses, use df.plot to make a grouped bar chart of sales and expenses by month, with a title and y-axis label in dollars.",
+ draw(ctx,w,h,P,s){const k=s.kind,series=s.both?[[PS,'sales',P.s[0]],[PE,'expenses',P.s[1]]]:[[PS,'sales',P.s[0]]];const f=F(w,h,k==='barh'?60:58);
+  const leg=()=>{if(series.length>1&&k!=='scatter'&&k!=='box')legend(ctx,P,series.map(x=>[x[1],x[2]]),f.l,f.t-20,k==='line'?'line':null);};
+  if(k==='line'||k==='area'){const X=lin(-.15,3.15,f.l,f.r),ym=k==='area'?(s.both?800:440):430,y0=k==='area'?0:180;const Y=lin(y0,ym,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:[0,1,2,3],xf:i=>PM[i],yt:ticks(y0,ym,5),box:true,noYgrid:true});
+   let base=[0,0,0,0];series.forEach(([v,,c])=>{const top=k==='area'?v.map((x,i)=>x+base[i]):v;if(k==='area'){ctx.fillStyle=c;ctx.globalAlpha=.5;ctx.beginPath();top.forEach((y,i)=>i?ctx.lineTo(X(i),Y(y)):ctx.moveTo(X(i),Y(y)));for(let i=3;i>=0;i--)ctx.lineTo(X(i),Y(base[i]));ctx.closePath();ctx.fill();ctx.globalAlpha=1;}ctx.strokeStyle=c;ctx.lineWidth=2;path(ctx,[0,1,2,3],top,X,Y);ctx.stroke();if(k==='area')base=top;});
+   if(k==='area'&&s.both)note(ctx,P,'pandas stacks areas by default: the top edge is sales + expenses',f.r,f.t-10,P.bad,'right');else leg();return;}
+  if(k==='bar'){const Y=lin(0,420,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,400,4),box:true,noYgrid:true});const{band,c}=catX(f,4);const n=series.length,bw=band*.5/n;series.forEach(([v,,cc],j)=>v.forEach((x,i)=>{ctx.fillStyle=cc;ctx.fillRect(c(i)-band*.25+j*bw,Y(x),bw,f.b-Y(x));}));catLabels(ctx,P,f,PM,c);leg();return;}
+  if(k==='barh'){const X=lin(0,420,f.l,f.r);axes(ctx,f,{P,x:X,xt:ticks(0,400,4),box:true});const band=(f.b-f.t)/4,n=series.length,bh=band*.5/n;series.forEach(([v,,cc],j)=>v.forEach((x,i)=>{const cy=f.t+band*(3-i+.5);ctx.fillStyle=cc;ctx.fillRect(f.l,cy-band*.25+j*bh,X(x)-f.l,bh);}));PM.forEach((m,i)=>{ctx.fillStyle=P.muted;ctx.font=P.sans;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(m,f.l-8,f.t+band*(3-i+.5));});leg();return;}
+  if(k==='scatter'){const X=lin(-.4,3.4,f.l,f.r),Y=lin(230,420,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:[0,1,2,3],xf:i=>PM[i],yt:ticks(240,420,4),box:true,noYgrid:true,yl:'sales'});PS.forEach((v,i)=>mark(ctx,'o',X(i),Y(v),9,P.s[0]));if(s.both)note(ctx,P,'kind=\'scatter\' needs one y column: expenses not drawn',f.r,f.t-10,P.bad,'right');return;}
+  if(k==='hist'){const all=series.flatMap(x=>x[0]);const edges=range(Math.min(...all),Math.max(...all),11);const cs=series.map(x=>hist(x[0],edges));const X=lin(edges[0]-10,edges[10]+10,f.l,f.r),Y=lin(0,2.2,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(edges[0],edges[10],5),yt:[0,1,2],box:true,noYgrid:true,yl:'Frequency'});cs.forEach((c,j)=>c.forEach((v,i)=>{if(!v)return;ctx.fillStyle=series[j][2];ctx.globalAlpha=s.both?.5:1;ctx.fillRect(X(edges[i]),Y(v),X(edges[i+1])-X(edges[i]),f.b-Y(v));ctx.globalAlpha=1;}));note(ctx,P,'10 bins for 4 values: mostly empty bins',f.r,f.t-10,P.bad,'right');leg();return;}
+  if(k==='box'){const Y=lin(180,420,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(200,400,4),box:true,noYgrid:true});const{band,c}=catX(f,series.length);series.forEach(([v],i)=>drawBox(ctx,P,c(i),Math.min(band*.4,90),Y,v,P.surface,1));catLabels(ctx,P,f,series.map(x=>x[1]),c);}}});
+add(P1,{id:'plot3d',name:'3D line plot',fn:"plt.axes(projection='3d')",lvl:'Advanced',q:'Relationship',
+ what:'Plots points or lines in three dimensions using matplotlib\'s 3D toolkit. Drag the view sliders to rotate it like view_init() does.',
+ pro:['Shows a path or surface that truly lives in three dimensions','Useful for physical trajectories and parameter sweeps'],
+ con:['Depth is ambiguous on a flat screen; positions are hard to read','Needs rotation to understand, which a static report can\'t offer'],
+ use:'Data that is genuinely 3-D and where you can rotate the plot (notebooks, interactive dashboards).',avoid:'Static reports. Use 2-D projections, color for the third variable, or small multiples instead.',
+ trap:'Rotate to elevation 90 (looking straight down): the spiral looks like a flat 2-D swirl. One fixed viewing angle can hide or invent structure.',
+ controls:[{t:'range',k:'el',label:'elev',min:0,max:90,step:1,v:30,fmt:v=>v+'°'},{t:'range',k:'az',label:'azim',min:-180,max:180,step:1,v:-60,fmt:v=>v+'°'},{t:'range',k:'fq',label:'turns factor',min:5,max:40,step:1,v:20,fmt:v=>v}],
+ code:s=>`ax_3d = plt.axes(projection='3d')\nz = np.linspace(0, 1, 100)\nx_3d = z * np.sin(${s.fq} * z)\ny_3d = z * np.cos(${s.fq} * z)\nax_3d.plot3D(x_3d, y_3d, z, 'blue')\nax_3d.view_init(elev=${s.el}, azim=${s.az})\nax_3d.set_title('3D Line Plot')\nplt.show()`,
+ ai:'Make a 3D line plot in matplotlib of a spiral: z from 0 to 1, x = z·sin(20z), y = z·cos(20z). Label all three axes and show it from two view angles side by side using view_init.',
+ draw(ctx,w,h,P,s){const el=+s.el*Math.PI/180,az=+s.az*Math.PI/180,sc=Math.min(w,h)*.3,cx=w/2,cy=h/2+10;
+  const pr=(x,y,z)=>{const xr=x*Math.cos(az)-y*Math.sin(az),yr=x*Math.sin(az)+y*Math.cos(az);return[cx+xr*sc,cy-(z*Math.cos(el)-yr*Math.sin(el))*sc,yr];};
+  const C=[-1,1];ctx.strokeStyle=P.line;ctx.lineWidth=1;const E=[];for(const a of C)for(const b of C){E.push([[-1,a,b],[1,a,b]],[[a,-1,b],[a,1,b]],[[a,b,-1],[a,b,1]]);}
+  E.forEach(([p,q])=>{const A=pr(...p),B=pr(...q);ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();});
+  ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='center';ctx.textBaseline='middle';[['x',[1.25,-1,-1]],['y',[-1,1.25,-1]],['z',[-1,-1,1.25]]].forEach(([t,p])=>{const q=pr(...p);ctx.fillText(t,q[0],q[1]);});
+  const zs=range(0,1,200);let prev=null;zs.forEach(z=>{const x=z*Math.sin(+s.fq*z),y=z*Math.cos(+s.fq*z);const q=pr(x,y,2*z-1);if(prev){ctx.strokeStyle=P.s[0];ctx.globalAlpha=.35+.65*cl((1-q[2])/2);ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();}prev=q;});ctx.globalAlpha=1;
+  ctx.fillStyle=P.ink;ctx.font=P.title;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('3D Line Plot',w/2,12);note(ctx,P,'Closer segments drawn darker',w-16,h-10,P.muted,'right');}});
+
+/* ---------- PART 2 ---------- */
+const HUEC=(P,i)=>P.s[i%P.s.length];
+add(P2,{id:'histplot',name:'Histogram',fn:'sns.histplot()',lvl:'Basic',q:'Distribution',
+ what:'Seaborn\'s histogram works straight from a DataFrame column, can add a KDE curve, and can split by a category with hue.',
+ pro:['Takes data= and column names directly','kde=True overlays a smooth curve','hue= compares groups in one call'],
+ con:['Layered hue histograms get muddy beyond 2–3 groups','Bin choice still changes the shape'],
+ use:'Looking at one numeric column, optionally split by a category.',avoid:'Comparing 4+ groups: use kdeplot, boxplot or facets instead.',
+ trap:'Set hue to department: four layered, half-transparent histograms are hard to separate. Try the same with kdeplot in the next step.',
+ controls:[{t:'range',k:'bins',label:'bins',min:5,max:40,step:1,v:20,fmt:v=>v},{t:'check',k:'kde',label:'kde=True',v:false},{t:'select',k:'hue',label:'hue',opts:[['none','None'],['gender','"gender"'],['department','"department"']],v:'none'}],
+ code:s=>`sns.histplot(data=df, x="age", bins=${s.bins}${s.kde?', kde=True':''}${s.hue!=='none'?`, hue="${s.hue}"`:''})`,
+ ai:'Using seaborn, plot a histogram of the age column in df with 20 bins and a KDE curve, colored by gender, with a title and axis labels.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const G=grp(D,s.hue);const all=col(D,'age');const lo=Math.min(...all),hi=Math.max(...all);const edges=range(lo,hi,+s.bins+1);const cs=G.map(g=>hist(col(g.rows,'age'),edges));const ym=Math.max(...cs.flat())*1.12;const bwid=edges[1]-edges[0];
+  const X=lin(lo-2,hi+2,f.l,f.r),Y=lin(0,ym,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(lo,hi,6),yt:ticks(0,ym,5),xl:'age',yl:'Count'});
+  cs.forEach((c,j)=>{const cc=s.hue==='none'?P.s[0]:HUEC(P,j);c.forEach((v,i)=>{if(!v)return;ctx.fillStyle=cc;ctx.globalAlpha=s.hue==='none'?.75:.4;ctx.fillRect(X(edges[i]),Y(v),X(edges[i+1])-X(edges[i]),f.b-Y(v));ctx.globalAlpha=1;ctx.strokeStyle=P.surface;ctx.lineWidth=.7;ctx.strokeRect(X(edges[i]),Y(v),X(edges[i+1])-X(edges[i]),f.b-Y(v));});
+   if(s.kde){const a=col(G[j].rows,'age');const xs=range(lo,hi,150);const k=kde(a,scott(a),xs);ctx.strokeStyle=cc;ctx.lineWidth=2.5;path(ctx,xs,k.map(v=>v*a.length*bwid),X,Y);ctx.stroke();}});
+  if(s.hue!=='none')legend(ctx,P,G.map((g,j)=>[g.name,HUEC(P,j)]),f.l+50,f.t-20);}});
+add(P2,{id:'kdeplot',name:'Density curve (KDE)',fn:'sns.kdeplot()',lvl:'Basic',q:'Distribution',
+ what:'A smoothed estimate of the distribution. Curves overlay cleanly, so comparing several groups is easier than with histograms.',
+ pro:['Smooth curves are easy to compare across groups','fill=True adds a shaded area','No bin edges to choose'],
+ con:['bw_adjust can invent or erase peaks','Spills beyond real limits, such as negative ages','"Density" on the y-axis is hard to explain'],
+ use:'Comparing distribution shapes for 2–5 groups.',avoid:'Small groups, or when exact counts matter.',
+ trap:'With hue, seaborn scales each curve by its group\'s share of the data (common_norm=True). Untick it to compare shapes instead of sizes.',
+ controls:[{t:'select',k:'hue',label:'hue',opts:[['none','None'],['gender','"gender"'],['department','"department"']],v:'department'},{t:'check',k:'fill',label:'fill=True',v:true},{t:'range',k:'bw',label:'bw_adjust',min:.2,max:3,step:.1,v:1,fmt:v=>(+v).toFixed(1)},{t:'check',k:'cn',label:'common_norm=True',v:true}],
+ code:s=>`sns.kdeplot(data=df, x="age"${s.fill?', fill=True':''}${s.hue!=='none'?`, hue="${s.hue}"`:''}${+s.bw!==1?`, bw_adjust=${(+s.bw).toFixed(1)}`:''}${!s.cn&&s.hue!=='none'?', common_norm=False':''})`,
+ ai:'Using seaborn, overlay filled KDE curves of age for each department in df, normalized separately (common_norm=False), with a legend title and labelled axes.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const G=grp(D,s.hue);const xs=range(0,75,200);const ys=G.map(g=>{const a=col(g.rows,'age');const k=kde(a,scott(a)*(+s.bw),xs);const sc=s.cn?a.length/D.length:1;return k.map(v=>v*sc);});const ym=Math.max(...ys.flat())*1.12;
+  const X=lin(0,75,f.l,f.r),Y=lin(0,ym,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(0,75,7),yt:ticks(0,ym,4),yf:v=>v.toFixed(3),xl:'age',yl:'Density'});
+  ys.forEach((y,j)=>{const c=s.hue==='none'?P.s[0]:HUEC(P,j);if(s.fill){ctx.fillStyle=c;ctx.globalAlpha=.22;ctx.beginPath();ctx.moveTo(X(xs[0]),f.b);y.forEach((v,i)=>ctx.lineTo(X(xs[i]),Y(v)));ctx.lineTo(X(xs[xs.length-1]),f.b);ctx.closePath();ctx.fill();ctx.globalAlpha=1;}ctx.strokeStyle=c;ctx.lineWidth=2;path(ctx,xs,y,X,Y);ctx.stroke();});
+  if(s.hue!=='none')legend(ctx,P,G.map((g,j)=>[g.name,HUEC(P,j)]),f.l+70,f.t-20);}});
+add(P2,{id:'rugplot',name:'Rug plot',fn:'sns.rugplot()',lvl:'Basic',q:'Distribution',
+ what:'A tick for every single observation along the axis. Usually added under a KDE or histogram to show where the real data points are.',
+ pro:['Shows every observation, no smoothing or binning','Reveals gaps, clusters and how much a KDE is extrapolating'],
+ con:['Identical values sit on top of each other and look like one tick','Says little about counts on its own'],
+ use:'As a companion to a KDE or histogram, with small to medium samples.',avoid:'Using it alone, or with thousands of points.',
+ trap:'Ages are whole numbers, so ~200 people share only ~50 positions. Lower alpha to reveal how many ticks are stacked on each age.',
+ controls:[{t:'check',k:'kde',label:'Add kdeplot on top',v:true},{t:'range',k:'ht',label:'height',min:.02,max:.2,step:.01,v:.05,fmt:v=>(+v).toFixed(2)},{t:'range',k:'a',label:'alpha',min:.05,max:1,step:.05,v:1,fmt:v=>(+v).toFixed(2)}],
+ code:s=>`${s.kde?'sns.kdeplot(data=df, x="age")\n':''}sns.rugplot(data=df, x="age", height=${(+s.ht).toFixed(2)}${+s.a<1?`, alpha=${(+s.a).toFixed(2)}`:''})`,
+ ai:'Using seaborn, plot a KDE of age from df with a rug plot underneath (height 0.05, alpha 0.3) so individual observations are visible.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const a=col(D,'age');const xs=range(0,75,200);const k=kde(a,scott(a),xs);const ym=s.kde?Math.max(...k)*1.15:1;const X=lin(0,75,f.l,f.r),Y=lin(0,ym,f.b,f.t);
+  axes(ctx,f,{P,x:X,y:Y,xt:ticks(0,75,7),yt:s.kde?ticks(0,ym,4):[0,.2,.4,.6,.8,1],yf:v=>s.kde?v.toFixed(3):v.toFixed(1),xl:'age',yl:s.kde?'Density':''});
+  if(s.kde){ctx.strokeStyle=P.s[0];ctx.lineWidth=2;path(ctx,xs,k,X,Y);ctx.stroke();}
+  const th=(+s.ht)*(f.b-f.t);ctx.strokeStyle=P.s[0];ctx.globalAlpha=+s.a;ctx.lineWidth=1.2;ctx.beginPath();a.forEach(v=>{const x=Math.round(X(v))+.5;ctx.moveTo(x,f.b);ctx.lineTo(x,f.b-th);});ctx.stroke();ctx.globalAlpha=1;
+  note(ctx,P,`${a.length} people · ${new Set(a).size} distinct ages`,f.r,f.t-10,P.muted,'right');}});
+add(P2,{id:'ecdfplot',name:'ECDF',fn:'sns.ecdfplot()',lvl:'Intermediate',q:'Distribution',
+ what:'For every value x, the share of observations at or below x. A rising step line from 0 to 1.',
+ pro:['No bins or bandwidth to choose: every point is used exactly','Read percentiles directly ("what share is under 40?")','Compares groups precisely'],
+ con:['Less intuitive: peaks show up as steep sections, not bumps','Unfamiliar to many audiences'],
+ use:'Percentiles, thresholds and precise comparison of groups.',avoid:'Explaining distribution shape to a general audience.',
+ trap:'Where the curve is steep, many values are packed together. That steep stretch is the "peak" you\'d see in a histogram.',
+ controls:[{t:'select',k:'hue',label:'hue',opts:[['none','None'],['gender','"gender"'],['department','"department"']],v:'none'},{t:'range',k:'thr',label:'Reference age',min:20,max:60,step:1,v:40,fmt:v=>v},{t:'seg',k:'st',label:'stat',opts:[['proportion','proportion'],['count','count']],v:'proportion'}],
+ code:s=>`sns.ecdfplot(data=df, x="age"${s.hue!=='none'?`, hue="${s.hue}"`:''}${s.st==='count'?', stat="count"':''})\nplt.axvline(${s.thr}, ls="--", color="grey")`,
+ ai:'Using seaborn, draw an ECDF of age in df split by department, add a dashed reference line at age 40, and print the share of each department aged 40 or under.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const G=grp(D,s.hue);const cnt=s.st==='count';const ym=cnt?Math.max(...G.map(g=>g.rows.length))*1.05:1;const X=lin(10,75,f.l,f.r),Y=lin(0,ym,f.b,f.t);
+  axes(ctx,f,{P,x:X,y:Y,xt:ticks(10,75,7),yt:cnt?ticks(0,ym,5):[0,.25,.5,.75,1],yf:v=>cnt?v:v.toFixed(2),xl:'age',yl:cnt?'Count':'Proportion'});const T=+s.thr;
+  G.forEach((g,j)=>{const a=col(g.rows,'age').sort((x,y)=>x-y);const c=s.hue==='none'?P.s[0]:HUEC(P,j);const n=a.length,sc=cnt?1:1/n;ctx.strokeStyle=c;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(10),Y(0));a.forEach((v,i)=>{ctx.lineTo(X(v),Y(i*sc));ctx.lineTo(X(v),Y((i+1)*sc));});ctx.lineTo(X(75),Y(n*sc));ctx.stroke();
+   const p=a.filter(v=>v<=T).length;ctx.fillStyle=c;ctx.font=P.bold;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(`${g.name==='all'?'All':g.name}: ${cnt?p:Math.round(p/n*100)+'%'} aged ≤ ${T}`,X(T)+10,f.b-24-j*18);});
+  ctx.strokeStyle=P.muted;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(X(T),f.t);ctx.lineTo(X(T),f.b);ctx.stroke();ctx.setLineDash([]);}});
+add(P2,{id:'countplot',name:'Count plot',fn:'sns.countplot()',lvl:'Basic',q:'Compare',
+ what:'A bar chart of how many rows fall in each category. Seaborn does the counting for you.',
+ pro:['No need to aggregate first: pass the raw DataFrame','hue= splits each bar by a second category'],
+ con:['Only counts rows; it can\'t show a numeric value','Default order is the order categories first appear'],
+ use:'How many records per category, raw data in hand.',avoid:'Data that is already aggregated (one row per category): use barplot instead.',
+ trap:'Order is first-appearance by default, which is arbitrary. Pass order= to sort by count or a meaningful order.',
+ controls:[{t:'check',k:'hue',label:'hue="gender"',v:true},{t:'check',k:'ord',label:'order by count',v:false}],
+ code:s=>`sns.countplot(data=df, x="department"${s.hue?', hue="gender"':''}${s.ord?',\n              order=df["department"].value_counts().index':''})`,
+ ai:'Using seaborn, make a count plot of department in df split by gender, with departments ordered by total count and count labels on top of each bar.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const tot=DEPTS.map((_,d)=>D.filter(o=>o.d===d).length);let idx=[0,1,2,3];if(s.ord)idx.sort((a,b)=>tot[b]-tot[a]);const ym=(s.hue?Math.max(...tot)*.7:Math.max(...tot))*1.15;const Y=lin(0,ym,f.b,f.t);
+  axes(ctx,f,{P,y:Y,yt:ticks(0,ym,5),yl:'count'});const{band,c}=catX(f,4);
+  idx.forEach((d,k)=>{if(s.hue){GEN.forEach((_,g)=>{const v=D.filter(o=>o.d===d&&o.g===g).length;ctx.fillStyle=HUEC(P,g);ctx.fillRect(c(k)-band*.4+g*band*.4,Y(v),band*.4,f.b-Y(v));});}else{ctx.fillStyle=HUEC(P,d);ctx.fillRect(c(k)-band*.4,Y(tot[d]),band*.8,f.b-Y(tot[d]));}});
+  catLabels(ctx,P,f,idx.map(i=>DEPTS[i]),c);if(s.hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),f.l+50,f.t-20);}});
+add(P2,{id:'barplot',name:'Bar plot (with error bars)',fn:'sns.barplot()',lvl:'Intermediate',q:'Compare',
+ what:'Each bar is a summary (the mean by default) of a numeric column per category. The black line is an error bar: a 95% confidence interval by default.',
+ pro:['Aggregates for you','Error bars show uncertainty, not just a single number','hue= compares subgroups'],
+ con:['Hides the spread and shape of the data behind each bar','Readers often confuse confidence intervals with spread'],
+ use:'Comparing a mean (or median) across categories, with uncertainty.',avoid:'When the spread matters: use box, violin or strip plots.',
+ trap:'Switch errorbar from "ci" to "sd". The bars stay the same but the lines grow a lot: always say which one you show.',
+ controls:[{t:'check',k:'hue',label:'hue="gender"',v:true},{t:'seg',k:'est',label:'estimator',opts:[['mean','mean'],['median','median']],v:'mean'},{t:'seg',k:'eb',label:'errorbar',opts:[['ci','"ci"'],['sd','"sd"'],['none','None']],v:'ci'}],
+ code:s=>`sns.barplot(data=df, x="department", y="salary"${s.hue?', hue="gender"':''}${s.est==='median'?', estimator="median"':''}${s.eb==='sd'?', errorbar="sd"':s.eb==='none'?', errorbar=None':''})\n# default errorbar is ("ci", 95): a bootstrapped 95% confidence interval`,
+ ai:'Using seaborn, make a bar plot of mean salary by department in df, split by gender, with error bars showing the standard deviation, and say in the title that bars are means ± 1 SD.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const Y=lin(0,110000,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,100000,5),yl:'salary'});const{band,c}=catX(f,4);const ng=s.hue?2:1;
+  DEPTS.forEach((_,d)=>{for(let g=0;g<ng;g++){const a=col(D.filter(o=>o.d===d&&(!s.hue||o.g===g)),'sal');const v=s.est==='mean'?mean(a):quant(a,.5);const bw=band*.8/ng,x=c(d)-band*.4+g*bw;ctx.fillStyle=s.hue?HUEC(P,g):HUEC(P,d);ctx.fillRect(x+1,Y(v),bw-2,f.b-Y(v));
+   if(s.eb!=='none'){const e=s.eb==='sd'?sd(a):1.96*sd(a)/Math.sqrt(a.length)*(s.est==='median'?1.25:1);ctx.strokeStyle=P.ink;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(x+bw/2,Y(v-e));ctx.lineTo(x+bw/2,Y(v+e));ctx.stroke();}}});
+  catLabels(ctx,P,f,DEPTS,c);if(s.hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),f.l+60,f.t-20);}});
+add(P2,{id:'sboxplot',name:'Box plot',fn:'sns.boxplot()',lvl:'Intermediate',q:'Distribution',
+ what:'The same five-number summary as plt.boxplot(), but grouped by a category column in one call.',
+ pro:['Compares many groups side by side','hue= adds a second grouping','Robust median and IQR'],
+ con:['Hides shape and sample size','Outlier rule (1.5 × IQR) flags many points in large samples'],
+ use:'Comparing spread and medians of a numeric column across categories.',avoid:'Small groups or when the shape matters.',
+ trap:'A box doesn\'t show how many people are behind it. HR\'s box may rest on 40 people, Sales\' on 60: add counts or points.',
+ controls:[{t:'check',k:'hue',label:'hue="gender"',v:false},{t:'check',k:'n',label:'Show group sizes',v:false}],
+ code:s=>`sns.boxplot(data=df, x="department", y="salary"${s.hue?', hue="gender"':''})${s.n?'\nprint(df.groupby("department").size())':''}`,
+ ai:'Using seaborn, make a box plot of salary by department from df, and annotate each box with its group size (n=...).',
+ draw(ctx,w,h,P,s){const f=F(w,h);const Y=lin(10000,120000,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(20000,120000,5),yl:'salary'});const{band,c}=catX(f,4);const ng=s.hue?2:1;
+  DEPTS.forEach((_,d)=>{for(let g=0;g<ng;g++){const rows=D.filter(o=>o.d===d&&(!s.hue||o.g===g));const bw=band*.7/ng,x=c(d)-band*.35+bw*(g+.5);drawBox(ctx,P,x,bw*.85,Y,col(rows,'sal'),s.hue?HUEC(P,g):HUEC(P,d));if(s.n){ctx.fillStyle=P.ink;ctx.font=P.mono;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('n='+rows.length,x,f.t+12);}}});
+  catLabels(ctx,P,f,DEPTS,c);if(s.hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),f.l+60,f.t-20);}});
+add(P2,{id:'sviolin',name:'Violin plot',fn:'sns.violinplot()',lvl:'Intermediate',q:'Distribution',
+ what:'A mirrored density per category with a mini box plot inside. Shows shape and summary together.',
+ pro:['Shape and summary in one view','inner= chooses box, quartile lines or points'],
+ con:['By default the density extends past the real data range','Smoothing hides small groups\' unreliability'],
+ use:'Comparing distribution shapes across a few groups.',avoid:'Bounded scores (like 1–10 ratings) without cut=0, and small groups.',
+ trap:'performance_score can only be 1–10, yet the default violins extend beyond both limits. Tick cut=0 to stop at the real data.',
+ controls:[{t:'check',k:'cut',label:'cut=0',v:false},{t:'seg',k:'inner',label:'inner',opts:[['box','"box"'],['quart','"quart"'],['point','"point"']],v:'box'}],
+ code:s=>`sns.violinplot(data=df, x="gender", y="performance_score"${s.cut?', cut=0':''}${s.inner!=='box'?`, inner="${s.inner}"`:''})`,
+ ai:'Using seaborn, make a violin plot of performance_score by gender from df with cut=0 so the violins stop at the observed range, and quartile lines inside.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const Y=lin(-3,14,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(-2,14,8),yl:'performance_score'});const{band,c}=catX(f,2);
+  [1,10].forEach(v=>{ctx.strokeStyle=P.bad;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(f.l,Y(v));ctx.lineTo(f.r,Y(v));ctx.stroke();ctx.setLineDash([]);});note(ctx,P,'Possible scores: 1 to 10',f.r,Y(10)-4,P.bad,'right');
+  GEN.forEach((_,g)=>{const a=col(D.filter(o=>o.g===g),'perf');const cx=c(g);const V=violin(ctx,P,cx,band*.38,Y,a,HUEC(P,g),{cut0:s.cut});
+   if(s.inner==='box'){const b=boxStats(a);ctx.strokeStyle=P.ink;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,Y(b.lo));ctx.lineTo(cx,Y(b.hi));ctx.stroke();ctx.fillStyle=P.ink;ctx.fillRect(cx-5,Y(b.q3),10,Y(b.q1)-Y(b.q3));ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(cx,Y(b.md),3.5,0,7);ctx.fill();}
+   else if(s.inner==='quart'){[.25,.5,.75].forEach(p=>{const v=quant(a,p);const j=Math.max(0,Math.min(119,Math.round((v-V.ys[0])/(V.ys[1]-V.ys[0]))));const hw=V.k[j]/V.m*band*.38;ctx.strokeStyle=P.ink;ctx.lineWidth=p===.5?2:1;ctx.setLineDash(p===.5?[]:[4,3]);ctx.beginPath();ctx.moveTo(cx-hw,Y(v));ctx.lineTo(cx+hw,Y(v));ctx.stroke();ctx.setLineDash([]);});}
+   else a.forEach(v=>{ctx.fillStyle=P.ink;ctx.fillRect(cx-1.5,Y(v)-1.5,3,3);});});
+  catLabels(ctx,P,f,GEN,c);}});
+add(P2,{id:'stripplot',name:'Strip plot',fn:'sns.stripplot()',lvl:'Basic',q:'Distribution',
+ what:'Every observation as a dot above its category, spread sideways with random jitter so dots don\'t stack.',
+ pro:['Nothing is hidden: you see every person','Sample size is obvious'],
+ con:['Overlaps beyond a few thousand points','Summary values are hard to read off'],
+ use:'Small to medium samples, or alongside a box or violin plot.',avoid:'Very large samples without transparency.',
+ trap:'Untick jitter: all dots fall on one vertical line and hide each other. Sideways position is random noise, not data.',
+ controls:[{t:'check',k:'jit',label:'jitter=True',v:true},{t:'range',k:'a',label:'alpha',min:.1,max:1,step:.05,v:.6,fmt:v=>(+v).toFixed(2)}],
+ code:s=>`sns.stripplot(data=df, x="gender", y="salary"${s.jit?'':', jitter=False'}${+s.a<1?`, alpha=${(+s.a).toFixed(2)}`:''})`,
+ ai:'Using seaborn, make a strip plot of salary by gender from df with jitter and 60% transparency, layered on top of a light box plot.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const Y=lin(10000,120000,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(20000,120000,5),yl:'salary'});const{band,c}=catX(f,2);const r=rng(9);
+  GEN.forEach((_,g)=>{ctx.fillStyle=HUEC(P,g);ctx.globalAlpha=+s.a;D.filter(o=>o.g===g).forEach(o=>{const j=s.jit?(r()*2-1)*band*.2:0;ctx.beginPath();ctx.arc(c(g)+j,Y(o.sal),3.5,0,7);ctx.fill();});ctx.globalAlpha=1;});catLabels(ctx,P,f,GEN,c);}});
+add(P2,{id:'swarmplot',name:'Swarm plot',fn:'sns.swarmplot()',lvl:'Intermediate',q:'Distribution',
+ what:'Like a strip plot, but dots are arranged side by side so none overlap. The width of the swarm shows where values are dense.',
+ pro:['Every point visible with no overlap','Shape of the distribution emerges from the layout'],
+ con:['Doesn\'t scale: with ~1,000+ points the swarm runs out of room','Slow on large data'],
+ use:'Up to a few hundred points per category.',avoid:'Large samples: use a violin, box or strip plot with alpha.',
+ trap:'Switch to 1,000 rows: the swarm can\'t fit, and seaborn warns that a share of points "cannot be placed" and piles them at the edges.',
+ controls:[{t:'seg',k:'n',label:'Rows',opts:[['200','200'],['1000','1,000']],v:'200'},{t:'range',k:'sz',label:'size',min:2,max:7,step:.5,v:4,fmt:v=>v}],
+ code:s=>`sns.swarmplot(data=${s.n==='1000'?'big_df':'df'}, x="gender", y="salary", size=${s.sz})`,
+ ai:'Using seaborn, make a swarm plot of salary by gender from df. If more than 500 points per group, fall back to a violin plot with a strip plot overlay instead.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const rows=s.n==='1000'?DF:D;const Y=lin(10000,125000,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(20000,120000,5),yl:'salary'});const{band,c}=catX(f,2);const R=+s.sz*.75+.5,Dm=2*R,half=band*.4;let lost=0;
+  GEN.forEach((_,g)=>{const pts=rows.filter(o=>o.g===g).map(o=>Y(o.sal)).sort((a,b)=>a-b);const placed=[];
+   pts.forEach(y=>{const nb=placed.filter(p=>Math.abs(p.y-y)<Dm);const cand=[0];nb.forEach(p=>{const dx=Math.sqrt(Dm*Dm-(p.y-y)**2);cand.push(p.x+dx,p.x-dx);});cand.sort((a,b)=>Math.abs(a)-Math.abs(b));let x=cand.find(cx=>nb.every(p=>(p.x-cx)**2+(p.y-y)**2>=Dm*Dm-.01));if(x==null)x=0;placed.push({x,y});});
+   ctx.fillStyle=HUEC(P,g);placed.forEach(p=>{let x=p.x;if(Math.abs(x)>half){lost++;x=Math.sign(x)*half;}ctx.beginPath();ctx.arc(c(g)+x,p.y,R,0,7);ctx.fill();});});
+  catLabels(ctx,P,f,GEN,c);if(lost)note(ctx,P,`UserWarning: ${Math.round(lost/rows.length*100)}% of the points cannot be placed`,f.r,f.t-10,P.bad,'right');}});
+add(P2,{id:'sscatter',name:'Scatter plot',fn:'sns.scatterplot()',lvl:'Basic',q:'Relationship',
+ what:'A scatter plot that maps extra columns to color (hue), marker (style) and size, straight from the DataFrame.',
+ pro:['hue, style and size add up to three more variables','Legends are built for you'],
+ con:['Each extra encoding makes the chart harder to read','Size is judged poorly by eye'],
+ use:'Two numeric variables, optionally split by one category.',avoid:'Mapping more than one extra variable unless it\'s essential.',
+ trap:'Turn on hue, style and size together. The chart is "richer" but much harder to read. One extra variable is usually the sweet spot.',
+ controls:[{t:'select',k:'hue',label:'hue',opts:[['none','None'],['gender','"gender"'],['department','"department"']],v:'gender'},{t:'check',k:'style',label:'style="gender"',v:false},{t:'check',k:'size',label:'size="experience"',v:false}],
+ code:s=>`sns.scatterplot(data=df, x="age", y="salary"${s.hue!=='none'?`, hue="${s.hue}"`:''}${s.style?', style="gender"':''}${s.size?', size="experience"':''})`,
+ ai:'Using seaborn, make a scatter plot of salary against age from df colored by gender, with axis labels including units and a legend outside the plot area.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(10,72,f.l,f.r),Y=lin(10000,120000,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(10,70,6),yt:ticks(20000,120000,5),xl:'age',yl:'salary'});
+  D.forEach(o=>{const ci=s.hue==='gender'?o.g:s.hue==='department'?o.d:0;const sz=s.size?3+o.exp/3.5:7;mark(ctx,s.style?(o.g?'x':'o'):'o',X(o.age),Y(o.sal),sz,s.hue==='none'?P.s[0]:HUEC(P,ci),1.6);});
+  if(s.hue!=='none')legend(ctx,P,(s.hue==='gender'?GEN:DEPTS).map((g,i)=>[g,HUEC(P,i)]),f.l+50,f.t-20);}});
+add(P2,{id:'lineplot',name:'Line plot (with confidence band)',fn:'sns.lineplot()',lvl:'Intermediate',q:'Change over time',
+ what:'Draws a line through the mean y at each x. When several rows share an x, seaborn aggregates them and shades a 95% confidence band.',
+ pro:['Aggregates repeated measurements automatically','The band shows uncertainty'],
+ con:['Joins x values with lines even when x isn\'t a sequence','Bands from 1–3 points per x are very wide and noisy'],
+ use:'x is time or an ordered variable with repeated measurements.',avoid:'x is just another measured variable (use scatterplot or regplot).',
+ trap:'age isn\'t a time series here, and each age has only a few people. The jagged line and wide band are mostly noise. Compare with regplot next.',
+ controls:[{t:'check',k:'hue',label:'hue="gender"',v:true},{t:'seg',k:'eb',label:'errorbar',opts:[['ci','"ci"'],['sd','"sd"'],['none','None']],v:'ci'}],
+ code:s=>`sns.lineplot(data=df, x="age", y="salary"${s.hue?', hue="gender"':''}${s.eb==='sd'?', errorbar="sd"':s.eb==='none'?', errorbar=None':''})`,
+ ai:'Using seaborn, make a line plot of mean salary by year from a long-format DataFrame with columns year, salary and gender, with a 95% confidence band per gender.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(16,72,f.l,f.r),Y=lin(0,130000,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(20,70,5),yt:ticks(0,120000,6),xl:'age',yl:'salary'});
+  (s.hue?[0,1]:[-1]).forEach(g=>{const rows=g<0?D:D.filter(o=>o.g===g);const ages=[...new Set(col(rows,'age'))].sort((a,b)=>a-b);const pts=ages.map(a=>{const v=col(rows.filter(o=>o.age===a),'sal');const m=mean(v);const e=v.length>1?(s.eb==='sd'?sd(v):1.96*sd(v)/Math.sqrt(v.length)):0;return{a,m,e};});const c=g<0?P.s[0]:HUEC(P,g);
+   if(s.eb!=='none'){ctx.fillStyle=c;ctx.globalAlpha=.18;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(X(p.a),Y(p.m+p.e)):ctx.moveTo(X(p.a),Y(p.m+p.e)));for(let i=pts.length-1;i>=0;i--)ctx.lineTo(X(pts[i].a),Y(Math.max(0,pts[i].m-pts[i].e)));ctx.closePath();ctx.fill();ctx.globalAlpha=1;}
+   ctx.strokeStyle=c;ctx.lineWidth=2;path(ctx,pts.map(p=>p.a),pts.map(p=>p.m),X,Y);ctx.stroke();});
+  if(s.hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),f.l+50,f.t-20,'line');}});
+add(P2,{id:'regplot',name:'Regression plot',fn:'sns.regplot() · sns.lmplot()',lvl:'Intermediate',q:'Relationship',
+ what:'A scatter plot with a fitted linear regression line and a shaded 95% confidence band. lmplot() is the version that supports hue= and facets.',
+ pro:['Shows the overall trend and how certain it is','lmplot fits a separate line per group'],
+ con:['A straight line may be the wrong model','Invites causal readings: correlation isn\'t causation'],
+ use:'Showing a roughly linear relationship and its uncertainty.',avoid:'Curved patterns, or predicting outside the data range.',
+ trap:'Switch x to experience: the fit is tighter because salary here is driven by experience, and age only matters through it. A good-looking line isn\'t an explanation.',
+ controls:[{t:'seg',k:'x',label:'x',opts:[['age','"age"'],['exp','"experience"']],v:'age'},{t:'check',k:'hue',label:'hue="gender" (lmplot)',v:false},{t:'check',k:'ci',label:'Confidence band',v:true}],
+ code:s=>{const xn=s.x==='age'?'age':'experience';return s.hue?`sns.lmplot(data=df, x="${xn}", y="salary", hue="gender"${s.ci?'':', ci=None'})`:`sns.regplot(data=df, x="${xn}", y="salary"${s.ci?'':', ci=None'})`;},
+ ai:'Using seaborn, plot salary against experience from df with a linear regression line and 95% confidence band, separate lines per gender (lmplot), and report the Pearson correlation in the title.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const xk=s.x;const xs0=col(D,xk);const xd=dom(xs0);const X=lin(xd[0],xd[1],f.l,f.r),Y=lin(10000,120000,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(xd[0],xd[1],6),yt:ticks(20000,120000,5),xl:xk==='age'?'age':'experience',yl:'salary'});
+  (s.hue?[0,1]:[-1]).forEach(g=>{const rows=g<0?D:D.filter(o=>o.g===g);const x=col(rows,xk),y=col(rows,'sal');const c=g<0?P.s[0]:HUEC(P,g);ctx.fillStyle=c;ctx.globalAlpha=.55;x.forEach((v,i)=>{ctx.beginPath();ctx.arc(X(v),Y(y[i]),3,0,7);ctx.fill();});ctx.globalAlpha=1;
+   const o=ols(x,y);const gx=range(Math.min(...x),Math.max(...x),40);if(s.ci){ctx.fillStyle=c;ctx.globalAlpha=.2;ctx.beginPath();gx.forEach((v,i)=>{const e=1.96*o.s*Math.sqrt(1/o.n+(v-o.mx)**2/o.sxx);i?ctx.lineTo(X(v),Y(o.a+o.b*v+e)):ctx.moveTo(X(v),Y(o.a+o.b*v+e));});for(let i=gx.length-1;i>=0;i--){const v=gx[i],e=1.96*o.s*Math.sqrt(1/o.n+(v-o.mx)**2/o.sxx);ctx.lineTo(X(v),Y(o.a+o.b*v-e));}ctx.closePath();ctx.fill();ctx.globalAlpha=1;}
+   ctx.strokeStyle=c;ctx.lineWidth=2.5;path(ctx,gx,gx.map(v=>o.a+o.b*v),X,Y);ctx.stroke();if(g<=0)note(ctx,P,`r = ${o.r.toFixed(2)}${g===0?' (Male)':''}`,f.r,f.t-10,P.ink,'right');});
+  if(s.hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),f.l+50,f.t-20);}});
+add(P2,{id:'jointplot',name:'Joint plot',fn:'sns.jointplot()',lvl:'Advanced',q:'Relationship',
+ what:'A relationship plot in the middle with each variable\'s own distribution on the top and right margins.',
+ pro:['Relationship and both distributions in one figure','kind= switches between scatter, regression and hexbin'],
+ con:['Takes a whole figure; can\'t be placed in a subplot grid','Some kinds don\'t support hue'],
+ use:'Exploring two numeric variables in depth.',avoid:'Dashboards or multi-panel figures (it creates its own figure).',
+ trap:"With hue on, try kind='reg' or 'hex': seaborn raises an error. Only scatter and kde support hue in jointplot.",
+ controls:[{t:'seg',k:'kind',label:'kind',opts:[['scatter','"scatter"'],['reg','"reg"'],['hex','"hex"']],v:'reg'},{t:'check',k:'hue',label:'hue="gender"',v:false}],
+ code:s=>`sns.jointplot(data=df, x="height", y="weight"${s.kind!=='scatter'?`, kind="${s.kind}"`:''}${s.hue?', hue="gender"':''})${s.hue&&s.kind!=='scatter'?'\n# ValueError: Use of `hue` with `kind=\''+s.kind+'\'` is not currently supported.':''}`,
+ ai:"Using seaborn, make a joint plot of weight against height from df with kind='reg', then a second one with kind='scatter' and hue='gender'.",
+ draw(ctx,w,h,P,s){const err=s.hue&&s.kind!=='scatter';const hue=s.hue&&!err;const sz=Math.min(w-140,h-120);const f={l:(w-sz)/2+20,r:(w-sz)/2+20+sz*.78,t:30+sz*.2,b:30+sz};const X=lin(140,200,f.l,f.r),Y=lin(35,110,f.b,f.t);
+  axes(ctx,f,{P,x:X,y:Y,xt:ticks(140,200,6),yt:ticks(40,110,7),xl:'height',yl:''});const G=hue?grp(D,'gender'):[{name:'all',rows:D}];
+  if(s.kind==='hex'){hexbin(ctx,f,col(D,'ht'),col(D,'wt'),X,Y,9,t=>{const c=hex2(P.s[0].length===7?P.s[0]:'#2c52c9');return `rgba(${c[0]*255|0},${c[1]*255|0},${c[2]*255|0},${.15+.85*t})`;});}
+  else G.forEach((g,j)=>{const c=hue?HUEC(P,j):P.s[0];ctx.fillStyle=c;ctx.globalAlpha=.6;g.rows.forEach(o=>{ctx.beginPath();ctx.arc(X(o.ht),Y(o.wt),3,0,7);ctx.fill();});ctx.globalAlpha=1;
+   if(s.kind==='reg'){const o=ols(col(D,'ht'),col(D,'wt'));ctx.strokeStyle=c;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(X(145),Y(o.a+o.b*145));ctx.lineTo(X(195),Y(o.a+o.b*195));ctx.stroke();}});
+  const mt={l:f.l,r:f.r,t:30,b:f.t-8},mr={l:f.r+8,r:f.r+8+sz*.2,t:f.t,b:f.b};
+  G.forEach((g,j)=>{const c=hue?HUEC(P,j):P.s[0];const eh=range(140,200,21),ch=hist(col(g.rows,'ht'),eh),ew=range(35,110,21),cw=hist(col(g.rows,'wt'),ew);const m1=Math.max(...ch)*(hue?1.6:1),m2=Math.max(...cw)*(hue?1.6:1);ctx.fillStyle=c;ctx.globalAlpha=hue?.45:.75;
+   ch.forEach((v,i)=>{const x0=X(eh[i]),x1=X(eh[i+1]);const hh=v/m1*(mt.b-mt.t);ctx.fillRect(x0,mt.b-hh,x1-x0-1,hh);});cw.forEach((v,i)=>{const y0=Y(ew[i]),y1=Y(ew[i+1]);const ww=v/m2*(mr.r-mr.l);ctx.fillRect(mr.l,y1,ww,y0-y1-1);});ctx.globalAlpha=1;});
+  ctx.save();ctx.translate(f.l-40,(f.t+f.b)/2);ctx.rotate(-Math.PI/2);ctx.fillStyle=P.muted;ctx.font=P.sans;ctx.textAlign='center';ctx.fillText('weight',0,0);ctx.restore();
+  if(err)note(ctx,P,`ValueError: hue not supported with kind='${s.kind}'`,w-12,h-6,P.bad,'right');if(hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),f.l+8,f.t+12);}});
+add(P2,{id:'pairplot',name:'Pair plot',fn:'sns.pairplot()',lvl:'Advanced',q:'Relationship',
+ what:'A grid of scatter plots for every pair of numeric columns, with each column\'s distribution on the diagonal.',
+ pro:['Overview of all pairwise relationships in one call','Great first step in exploring a new dataset','hue= colors every panel by group'],
+ con:['Grows quadratically: 10 columns means 100 panels','Small panels; details are hard to read'],
+ use:'Exploring 3–6 numeric columns at the start of an analysis.',avoid:'Many columns (pick a subset) or very large data (sample first).',
+ trap:'The upper triangle repeats the lower one, mirrored. corner=True removes the duplicates and halves the reading effort.',
+ controls:[{t:'check',k:'hue',label:'hue="gender"',v:true},{t:'seg',k:'diag',label:'diag_kind',opts:[['auto','auto'],['hist','"hist"'],['kde','"kde"']],v:'auto'},{t:'check',k:'corner',label:'corner=True',v:false}],
+ code:s=>`sns.pairplot(df[['age', 'salary', 'experience'${s.hue?", 'gender'":''}]]${s.hue?', hue="gender"':''}${s.diag!=='auto'?`, diag_kind="${s.diag}"`:''}${s.corner?', corner=True':''})`,
+ ai:'Using seaborn, make a pair plot of age, salary and experience from df colored by gender, with corner=True and KDE curves on the diagonal.',
+ draw(ctx,w,h,P,s){const V=[['age','age'],['sal','salary'],['exp','experience']];const n=3,pad=50,cs=Math.min((w-pad-20)/n,(h-pad-30)/n),ox=(w-cs*n)/2+pad/2,oy=16;const G=s.hue?grp(D,'gender'):[{name:'all',rows:D}];const dk=s.diag==='auto'?(s.hue?'kde':'hist'):s.diag;
+  const doms=V.map(([k])=>dom(col(D,k)));
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){if(s.corner&&j>i)continue;const f={l:ox+j*cs+6,r:ox+(j+1)*cs-6,t:oy+i*cs+6,b:oy+(i+1)*cs-6};ctx.strokeStyle=P.line;ctx.strokeRect(f.l,f.t,f.r-f.l,f.b-f.t);const X=lin(doms[j][0],doms[j][1],f.l,f.r);
+   if(i===j){const xs=range(doms[j][0],doms[j][1],60);G.forEach((g,gi)=>{const a=col(g.rows,V[j][0]);const c=s.hue?HUEC(P,gi):P.s[0];if(dk==='kde'){const k=kde(a,scott(a),xs);const m=Math.max(...G.map(gg=>Math.max(...kde(col(gg.rows,V[j][0]),scott(col(gg.rows,V[j][0])),xs))));ctx.strokeStyle=c;ctx.lineWidth=1.8;ctx.beginPath();xs.forEach((x,q)=>{const y=f.b-k[q]/m*(f.b-f.t)*.9;q?ctx.lineTo(X(x),y):ctx.moveTo(X(x),y);});ctx.stroke();}
+     else{const e=range(doms[j][0],doms[j][1],13),c2=hist(a,e),m=Math.max(...c2)*1.1;ctx.fillStyle=c;ctx.globalAlpha=s.hue?.45:.75;c2.forEach((v,q)=>{const hh=v/m*(f.b-f.t);ctx.fillRect(X(e[q]),f.b-hh,X(e[q+1])-X(e[q])-1,hh);});ctx.globalAlpha=1;}});}
+   else{const Y=lin(doms[i][0],doms[i][1],f.b,f.t);G.forEach((g,gi)=>{ctx.fillStyle=s.hue?HUEC(P,gi):P.s[0];ctx.globalAlpha=.55;g.rows.forEach(o=>{ctx.fillRect(X(o[V[j][0]])-1.5,Y(o[V[i][0]])-1.5,3,3);});ctx.globalAlpha=1;});}
+   ctx.fillStyle=P.muted;ctx.font=P.mono;if(i===n-1){ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(V[j][1],(f.l+f.r)/2,f.b+6);}if(j===0){ctx.save();ctx.translate(f.l-12,(f.t+f.b)/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(V[i][1],0,0);ctx.restore();}}
+  if(s.hue)legend(ctx,P,GEN.map((g,i)=>[g,HUEC(P,i)]),w-150,h-12);},tall:true});
+add(P2,{id:'heatmap',name:'Heatmap',fn:'sns.heatmap()',lvl:'Intermediate',q:'Relationship',
+ what:'A colored grid for any matrix: a pivot table of averages, or a correlation matrix. annot=True prints the numbers in the cells.',
+ pro:['Summarizes a whole table at a glance','Great for correlation matrices and two-way pivots'],
+ con:['Color differences are hard to judge precisely: annotate','Default color range stretches to the data, exaggerating tiny differences'],
+ use:'Two categorical dimensions with one value each, or a correlation matrix.',avoid:'Exact comparisons without annotations.',
+ trap:'In the pivot view, mean ages differ by only a few years, yet the default colors span dark to light. Tick "Fix the color range" to see how small the differences really are.',
+ controls:[{t:'seg',k:'data',label:'Data',opts:[['pivot','pivot table'],['corr','correlation']],v:'corr'},{t:'select',k:'cmap',label:'cmap',opts:[['rocket','rocket (default)'],['coolwarm','"coolwarm"'],['viridis','"viridis"'],['RdBu_r','"RdBu_r"']],v:'coolwarm'},{t:'check',k:'annot',label:'annot=True',v:true},{t:'check',k:'fix',label:'Fix the color range',v:false}],
+ code:s=>s.data==='pivot'?`tdf = df.pivot_table(index='gender', columns='department', values='age', observed=False)\nsns.heatmap(tdf${s.annot?', annot=True, fmt=".1f"':''}${s.cmap!=='rocket'?`, cmap="${s.cmap}"`:''}${s.fix?', vmin=18, vmax=60':''})`:`corr = df[['salary', 'age', 'height', 'weight', 'experience']].corr()\nsns.heatmap(corr${s.annot?', annot=True, fmt=".2f"':''}${s.cmap!=='rocket'?`, cmap="${s.cmap}"`:''}${s.fix?', vmin=-1, vmax=1, center=0':''})`,
+ ai:'Using seaborn, make a correlation heatmap of the numeric columns in df, annotated with 2 decimals, using a diverging colormap fixed from -1 to 1 and centered at 0.',
+ draw(ctx,w,h,P,s){let rows,cols,M,vmin,vmax;if(s.data==='pivot'){rows=['Female','Male'];cols=['HR','IT','Marketing','Sales'];const gi={Female:1,Male:0},di={HR:2,IT:1,Marketing:3,Sales:0};M=rows.map(r=>cols.map(c=>mean(col(D.filter(o=>o.g===gi[r]&&o.d===di[c]),'age'))));const fl=M.flat();vmin=s.fix?18:Math.min(...fl);vmax=s.fix?60:Math.max(...fl);}
+  else{rows=cols=['salary','age','height','weight','experience'];const k=['sal','age','ht','wt','exp'];M=k.map(a=>k.map(b=>ols(col(D,a),col(D,b)).r));const fl=M.flat();vmin=s.fix?-1:Math.min(...fl);vmax=s.fix?1:Math.max(...fl);}
+  const cm=CMAP[s.cmap];const lab=90,cbw=60;const cw=Math.min((w-lab-cbw-30)/cols.length,(h-70)/rows.length*(s.data==='pivot'?1.6:1)),ch=s.data==='pivot'?Math.min((h-70)/rows.length,cw*.7):cw;const ox=lab+10,oy=20;
+  rows.forEach((r,i)=>cols.forEach((c,j)=>{const v=M[i][j];const t=(v-vmin)/(vmax-vmin||1);const cc=cm(s.fix&&s.data==='corr'?(v+1)/2:t);ctx.fillStyle=rgb(cc);ctx.fillRect(ox+j*cw,oy+i*ch,cw,ch);if(s.annot){ctx.fillStyle=lum(cc)>.5?'#141a26':'#ffffff';ctx.font=P.bold;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v.toFixed(s.data==='pivot'?1:2),ox+(j+.5)*cw,oy+(i+.5)*ch);}}));
+  ctx.fillStyle=P.ink;ctx.font=P.sans;rows.forEach((r,i)=>{ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(r,ox-8,oy+(i+.5)*ch);});cols.forEach((c,j)=>{ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(c,ox+(j+.5)*cw,oy+rows.length*ch+6);});
+  const bx=ox+cols.length*cw+18,bh=rows.length*ch;for(let i=0;i<bh;i++){ctx.fillStyle=rgb(cm(1-i/bh));ctx.fillRect(bx,oy+i,14,1.5);}ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(vmax.toFixed(s.data==='pivot'?1:2),bx+18,oy+4);ctx.fillText(vmin.toFixed(s.data==='pivot'?1:2),bx+18,oy+bh-4);}});
+add(P2,{id:'facetgrid',name:'FacetGrid (small multiples)',fn:'sns.FacetGrid().map()',lvl:'Advanced',q:'Layout & style',
+ what:'Splits the data by one or two categories and draws the same chart for each subset in a grid. row= and col= choose the splits.',
+ pro:['Compares many subgroups without cluttering one chart','Shared axes make comparisons fair','Works with any plotting function via .map()'],
+ con:['Each panel has fewer points, so patterns get noisier','Grids with many rows and columns get tiny'],
+ use:'Checking whether a pattern holds across subgroups.',avoid:'Subgroups with very few observations each.',
+ trap:'Each of these 8 panels has only ~25 people. Patterns that appear in one panel may be noise. Untick sharey and the comparisons become unfair.',
+ controls:[{t:'seg',k:'fn',label:'map',opts:[['scatter','sns.scatterplot'],['hist','sns.histplot']],v:'scatter'},{t:'check',k:'sy',label:'sharey=True',v:true}],
+ code:s=>`g = sns.FacetGrid(df, row="gender", col="department"${s.sy?'':', sharey=False'})\ng.map(${s.fn==='scatter'?'sns.scatterplot, "age", "salary"':'sns.histplot, "age"'})`,
+ ai:'Using seaborn, make a FacetGrid from df with rows by gender and columns by department, mapping a scatter plot of salary vs age into each panel with shared axes.',
+ draw(ctx,w,h,P,s){const R=2,C=4,gap=8,lp=46,pw=(w-lp-gap*(C-1)-12)/C,ph=(h-50-gap*(R-1))/R;
+  const pans=[];for(let r=0;r<R;r++)for(let c=0;c<C;c++)pans.push({r,c,rows:D.filter(o=>o.g===r&&o.d===c)});
+  let ymaxs=pans.map(p=>{if(s.fn==='scatter')return dom(col(p.rows,'sal'));const e=range(15,70,11);return[0,Math.max(...hist(col(p.rows,'age'),e))*1.1];});if(s.sy){const lo=Math.min(...ymaxs.map(d=>d[0])),hi=Math.max(...ymaxs.map(d=>d[1]));ymaxs=ymaxs.map(()=>[lo,hi]);}
+  pans.forEach((p,i)=>{const ox=lp+p.c*(pw+gap),oy=26+p.r*(ph+gap);const f={l:ox,r:ox+pw,t:oy,b:oy+ph-18};ctx.strokeStyle=P.line;ctx.strokeRect(f.l,f.t,f.r-f.l,f.b-f.t);const X=lin(15,70,f.l,f.r),Y=lin(ymaxs[i][0],ymaxs[i][1],f.b,f.t);
+   ctx.fillStyle=P.ink;ctx.font=P.mono;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(`${GEN[p.r]} | ${DEPTS[p.c]}`,(f.l+f.r)/2,f.t-3);
+   if(s.fn==='scatter'){ctx.fillStyle=P.s[0];p.rows.forEach(o=>{ctx.beginPath();ctx.arc(X(o.age),Y(o.sal),2.4,0,7);ctx.fill();});}else{const e=range(15,70,11),c=hist(col(p.rows,'age'),e);ctx.fillStyle=P.s[0];c.forEach((v,q)=>{ctx.fillRect(X(e[q]),Y(v),X(e[q+1])-X(e[q])-1,f.b-Y(v));});}
+   if(p.c===0||!s.sy){ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='right';ctx.textBaseline='middle';const t=ticks(ymaxs[i][0],ymaxs[i][1],3);t.forEach(v=>{if(Y(v)>=f.t&&Y(v)<=f.b)ctx.fillText(short(v),f.l-4,Y(v));});}
+   if(p.r===1){ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='center';ctx.textBaseline='top';[20,40,60].forEach(v=>ctx.fillText(v,X(v),f.b+3));}});},tall:true});
+add(P2,{id:'catplot',name:'Categorical wrapper',fn:'sns.catplot()',lvl:'Advanced',q:'Layout & style',
+ what:'One function for all categorical plots, with built-in faceting. kind= picks the chart, col= and row= split into panels.',
+ pro:['Switch chart type by changing one word','Facets by col/row without building a FacetGrid'],
+ con:['Creates its own figure, so it can\'t go into an existing subplot','Many options in one call can be confusing'],
+ use:'Comparing a numeric variable across categories, split into panels.',avoid:'When you need to place the chart inside your own subplot layout (use boxplot etc. with ax=).',
+ trap:'Same data, five kinds: compare what each one hides. kind="bar" shows only means; "strip" shows every point but no summary.',
+ controls:[{t:'seg',k:'kind',label:'kind',opts:[['strip','"strip"'],['box','"box"'],['violin','"violin"'],['bar','"bar"'],['point','"point"']],v:'box'}],
+ code:s=>`sns.catplot(data=df, x="department", y="salary", col="gender"${s.kind!=='strip'?`, kind="${s.kind}"`:''})\n# kind defaults to "strip"`,
+ ai:'Using seaborn catplot, compare salary across departments in df with one panel per gender, using kind="box", and set a shared title above both panels.',
+ draw(ctx,w,h,P,s){const gap=24,pw=(w-gap-70)/2;GEN.forEach((gname,g)=>{const ox=58+g*(pw+gap);const f={l:ox,r:ox+pw,t:44,b:h-44};const Y=lin(10000,125000,f.b,f.t);
+  axes(ctx,f,{P,y:Y,yt:g===0?ticks(20000,120000,5):[],box:true});ctx.fillStyle=P.ink;ctx.font=P.title;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('gender = '+gname,(f.l+f.r)/2,f.t-8);const{band,c}=catX(f,4);const r=rng(4);
+  DEPTS.forEach((_,d)=>{const a=col(D.filter(o=>o.g===g&&o.d===d),'sal');const cc=HUEC(P,d),cx=c(d);
+   if(s.kind==='strip'){ctx.fillStyle=cc;a.forEach(v=>{ctx.beginPath();ctx.arc(cx+(r()*2-1)*band*.2,Y(v),2.6,0,7);ctx.fill();});}
+   else if(s.kind==='box')drawBox(ctx,P,cx,band*.6,Y,a,cc);
+   else if(s.kind==='violin'){violin(ctx,P,cx,band*.4,Y,a,cc);const b=boxStats(a);ctx.fillStyle=P.ink;ctx.fillRect(cx-3,Y(b.q3),6,Y(b.q1)-Y(b.q3));}
+   else{const m=mean(a),e=1.96*sd(a)/Math.sqrt(a.length);if(s.kind==='bar'){ctx.fillStyle=cc;ctx.fillRect(cx-band*.35,Y(m),band*.7,f.b-Y(m));}else{mark(ctx,'o',cx,Y(m),9,P.s[0]);}ctx.strokeStyle=P.ink;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,Y(m-e));ctx.lineTo(cx,Y(m+e));ctx.stroke();}});
+  if(s.kind==='point'){ctx.strokeStyle=P.s[0];ctx.lineWidth=2;ctx.beginPath();DEPTS.forEach((_,d)=>{const m=mean(col(D.filter(o=>o.g===g&&o.d===d),'sal'));d?ctx.lineTo(c(d),Y(m)):ctx.moveTo(c(d),Y(m));});ctx.stroke();}
+  ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='center';ctx.textBaseline='top';DEPTS.forEach((dn,d)=>ctx.fillText(dn,c(d),f.b+6));});}});
+const SNSPAL={deep:['#4C72B0','#DD8452','#55A868','#C44E52'],muted:['#4878D0','#EE854A','#6ACC64','#D65F5F'],pastel:['#A1C9F4','#FFB482','#8DE5A1','#FF9F9B'],colorblind:['#0173B2','#DE8F05','#029E73','#D55E00'],magma:['#2D1160','#721F81','#B73779','#F1605D'],viridis:['#414487','#2A788E','#22A884','#7AD151']};
+add(P2,{id:'themes',name:'Themes, context & palettes',fn:'sns.set_theme() · set_context() · set_palette()',lvl:'Basic',q:'Layout & style',
+ what:'Global settings that restyle every chart that follows: the background and grid (style), the size of text and lines (context), and the colors (palette).',
+ pro:['One line restyles every chart','context="talk" or "poster" makes slides readable from the back of the room','Colorblind-safe palettes are built in'],
+ con:['Settings stay on for the whole session until you change them','A sequential palette like magma implies order where there is none'],
+ use:'At the top of a notebook, and when preparing figures for slides or print.',avoid:'Sequential palettes (magma, viridis) for unordered categories like departments.',
+ trap:'The notebook uses palette "magma" for unordered departments. Dark-to-light colors suggest a ranking. Use "colorblind" or "deep" for categories.',
+ controls:[{t:'seg',k:'style',label:'style',opts:[['darkgrid','darkgrid'],['whitegrid','whitegrid'],['white','white'],['ticks','ticks']],v:'whitegrid'},{t:'seg',k:'ctx',label:'context',opts:[['paper','paper'],['notebook','notebook'],['talk','talk'],['poster','poster']],v:'notebook'},{t:'select',k:'pal',label:'palette',opts:Object.keys(SNSPAL).map(k=>[k,'"'+k+'"']),v:'magma'}],
+ code:s=>`sns.set_context("${s.ctx}")   # scales text and lines\nsns.set_style("${s.style}")\nsns.set_palette("${s.pal}")\n\nplt.figure(figsize=(8, 5))\nsns.barplot(data=df, x="department", y="salary", hue="department", legend=False)\nplt.title("Mean salary by department")\nplt.show()`,
+ ai:'Set seaborn to the "talk" context, "whitegrid" style and "colorblind" palette, then make a bar plot of mean salary by department from df with a descriptive title.',
+ draw(ctx,w,h,P,s){const fs={paper:.8,notebook:1,talk:1.5,poster:2}[s.ctx];const bg='#ffffff',axbg=s.style==='darkgrid'?'#EAEAF2':'#ffffff',grid=s.style==='darkgrid'?'#ffffff':'#cccccc',ink='#262626';
+  ctx.fillStyle=bg;ctx.fillRect(8,8,w-16,h-16);const f={l:40+46*fs,r:w-30,t:30+22*fs,b:h-30-26*fs};ctx.fillStyle=axbg;ctx.fillRect(f.l,f.t,f.r-f.l,f.b-f.t);const Y=lin(0,80000,f.b,f.t);
+  const yt=[0,20000,40000,60000,80000];if(s.style==='darkgrid'||s.style==='whitegrid'){ctx.strokeStyle=grid;ctx.lineWidth=1*fs;yt.forEach(v=>{ctx.beginPath();ctx.moveTo(f.l,Y(v));ctx.lineTo(f.r,Y(v));ctx.stroke();});}
+  if(s.style==='white'||s.style==='ticks'||s.style==='whitegrid'){ctx.strokeStyle=s.style==='whitegrid'?'#cccccc':ink;ctx.lineWidth=1.2*fs;ctx.strokeRect(f.l,f.t,f.r-f.l,f.b-f.t);}
+  const{band,c}=catX(f,4);const pl=SNSPAL[s.pal];DEPTS.forEach((_,d)=>{const a=col(D.filter(o=>o.d===d),'sal'),m=mean(a),e=1.96*sd(a)/Math.sqrt(a.length);ctx.fillStyle=pl[d];ctx.fillRect(c(d)-band*.4,Y(m),band*.8,f.b-Y(m));ctx.strokeStyle='#3d3d3d';ctx.lineWidth=1.5*fs;ctx.beginPath();ctx.moveTo(c(d),Y(m-e));ctx.lineTo(c(d),Y(m+e));ctx.stroke();});
+  ctx.fillStyle=ink;ctx.font=`${11*fs}px "IBM Plex Sans", system-ui, sans-serif`;ctx.textAlign='right';ctx.textBaseline='middle';yt.forEach(v=>{ctx.fillText(short(v),f.l-6*fs-(s.style==='ticks'?4:0),Y(v));if(s.style==='ticks'){ctx.strokeStyle=ink;ctx.beginPath();ctx.moveTo(f.l-5*fs,Y(v));ctx.lineTo(f.l,Y(v));ctx.stroke();}});
+  ctx.textAlign='center';ctx.textBaseline='top';DEPTS.forEach((dn,d)=>ctx.fillText(dn,c(d),f.b+5*fs));ctx.font=`600 ${13*fs}px "IBM Plex Sans", system-ui, sans-serif`;ctx.textBaseline='bottom';ctx.fillText('Mean salary by department',(f.l+f.r)/2,f.t-6*fs);
+  ctx.fillStyle=P.muted;ctx.font=P.mono;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.fillText('Preview of the saved figure',12,h-12);}});
+
+/* ---------- PART 3 ---------- */
+add(P3,{id:'stacked',name:'Grouped & stacked bars',fn:"df.plot(kind='bar', stacked=True)",lvl:'Intermediate',q:'Composition',data:'Data: quarterly cloud spend in $k by service for 2026. ML spend grows 22% a month.',
+ what:'Three ways to show several categories per group: side by side (grouped), on top of each other (stacked), or as shares of 100%.',
+ pro:['Grouped: compares services within a quarter','Stacked: shows totals and parts together','100%: shows how the mix shifts'],
+ con:['Grouped clutters with many series','Stacked: middle segments float, so they\'re hard to compare','100% hides the totals'],
+ use:'Grouped for comparing parts, stacked for totals, 100% for mix.',avoid:'More than ~5 segments: use small multiples instead.',
+ trap:'In the stacked view, compare Storage across quarters. Its segment floats on Compute, so changes are hard to see. Only the bottom series is easy to read.',
+ controls:[{t:'seg',k:'m',label:'Mode',opts:[['grouped','grouped'],['stacked','stacked'],['pct','100%']],v:'stacked'}],
+ code:s=>`q = (df.assign(quarter=pd.to_datetime(df.month).dt.quarter)\n       .pivot_table(index="quarter", columns="service", values="cost", aggfunc="sum"))\n${s.m==='pct'?'q = q.div(q.sum(axis=1), axis=0) * 100   # convert to shares\n':''}q.plot(kind="bar"${s.m!=='grouped'?', stacked=True':''})\nplt.ylabel("${s.m==='pct'?'Share of spend (%)':'Cost ($k)'}")\nplt.legend(bbox_to_anchor=(1, 1))`,
+ ai:'From a DataFrame with month, service and cost, aggregate cost by quarter and service, then make three bar charts side by side: grouped, stacked and 100% stacked.',
+ draw(ctx,w,h,P,s){const f=F(w,h,58,22,56,48);const Q=[0,1,2,3].map(q=>SERV.map((_,i)=>SPEND[i].slice(q*3,q*3+3).reduce((a,b)=>a+b,0)));const tot=Q.map(v=>v.reduce((a,b)=>a+b,0));
+  const ym=s.m==='pct'?100:s.m==='stacked'?Math.max(...tot)*1.08:Math.max(...Q.flat())*1.1;const Y=lin(0,ym,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,ym,5),yf:v=>s.m==='pct'?v+'%':'$'+short(v)+'k'});const{band,c}=catX(f,4);
+  Q.forEach((vals,q)=>{if(s.m==='grouped'){const bw=band*.8/6;vals.forEach((v,i)=>{ctx.fillStyle=P.s[i];ctx.fillRect(c(q)-band*.4+i*bw,Y(v),bw-1,f.b-Y(v));});}
+   else{let acc=0;vals.forEach((v,i)=>{const vv=s.m==='pct'?v/tot[q]*100:v;ctx.fillStyle=P.s[i];ctx.fillRect(c(q)-band*.3,Y(acc+vv),band*.6,Y(acc)-Y(acc+vv));ctx.strokeStyle=P.surface;ctx.strokeRect(c(q)-band*.3,Y(acc+vv),band*.6,Y(acc)-Y(acc+vv));acc+=vv;});}});
+  catLabels(ctx,P,f,['Q1','Q2','Q3','Q4'],c);legend(ctx,P,SERV.map((n,i)=>[n,P.s[i]]),f.l,f.t-30);}});
+add(P3,{id:'dumbbell',name:'Dot plot / dumbbell',fn:'plt.hlines() + plt.scatter()',lvl:'Intermediate',q:'Compare',data:'Data: revenue in $M for 7 sales regions, 2025 and 2026.',
+ what:'Two dots per category joined by a line, showing a before and after value and the change between them.',
+ pro:['Shows two values and the change in one row','Far less ink than paired bars','The axis may start above zero'],
+ con:['Less familiar than bars','Needs a clear color key for which dot is which'],
+ use:'Before/after comparisons across categories.',avoid:'More than 2–3 values per category.',
+ trap:'South went down. Without color for direction or a delta label, declines are easy to miss among the gains.',
+ controls:[{t:'check',k:'sort',label:'Sort by 2026',v:true}],
+ code:s=>`d = df.pivot(index="region", columns="year", values="revenue")${s.sort?'.sort_values(2026)':''}\nplt.hlines(d.index, d[2025], d[2026], color="lightgrey", lw=3)\nplt.scatter(d[2025], d.index, color="grey", label="2025", zorder=3)\nplt.scatter(d[2026], d.index, color="C0", label="2026", zorder=3)\nplt.legend(); plt.xlabel("Revenue ($M)")`,
+ ai:'Make a matplotlib dumbbell chart comparing 2025 and 2026 revenue for each region: a grey line between years, a grey dot for 2025, a blue dot for 2026, sorted by 2026, with the change labelled.',
+ draw(ctx,w,h,P,s){const f=F(w,h,96,30,56,40);let idx=REG.map((_,i)=>i);if(s.sort)idx.sort((a,b)=>R26[b]-R26[a]);const X=lin(1,7,f.l,f.r);axes(ctx,f,{P,x:X,xt:ticks(1,7,6),xf:v=>'$'+v+'M',xgrid:true});const band=(f.b-f.t)/idx.length;
+  idx.forEach((i,k)=>{const cy=f.t+band*(k+.5);ctx.strokeStyle=P.line;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(X(R25[i]),cy);ctx.lineTo(X(R26[i]),cy);ctx.stroke();mark(ctx,'o',X(R25[i]),cy,12,P.s[5]);mark(ctx,'o',X(R26[i]),cy,12,P.accent);
+   ctx.fillStyle=P.ink;ctx.font=P.sans;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(REG[i],f.l-8,cy);const d=R26[i]-R25[i];ctx.font=P.mono;ctx.fillStyle=d<0?P.bad:P.muted;ctx.textAlign='left';ctx.fillText((d>=0?'+':'−')+Math.abs(d).toFixed(1),Math.max(X(R25[i]),X(R26[i]))+12,cy);});
+  legend(ctx,P,[['2025',P.s[5]],['2026',P.accent]],f.l,f.t-26);}});
+add(P3,{id:'logscale',name:'Log scale',fn:"plt.yscale('log')",lvl:'Intermediate',q:'Change over time',data:'Data: monthly active users of 4 apps, Jan 2025–Dec 2026. Ledgerly +6%/month, Sproutly +25%/month, Tallyo +8,000/month, Mapsy seasonal.',
+ what:'A log axis spaces 1k, 10k, 100k equally. Constant percentage growth becomes a straight line, and series of very different sizes fit on one chart.',
+ pro:['Compares growth rates directly: steeper means faster','Small and large series both stay readable'],
+ con:['General audiences misread log axes','Can\'t show zero or negative values'],
+ use:'Growth rates, or data spanning several orders of magnitude.',avoid:'Audiences unfamiliar with log scales, unless you label it clearly.',
+ trap:'On linear, Sproutly looks flat for a year despite growing 25% a month. Switch to log and it\'s the steepest line from the start.',
+ controls:[{t:'seg',k:'sc',label:'yscale',opts:[['linear',"'linear'"],['log',"'log'"]],v:'linear'}],
+ code:s=>`ax = sns.lineplot(data=df, x="month", y="users", hue="app")\n${s.sc==='log'?'ax.set_yscale("log")\nax.set_ylabel("Monthly active users (log scale)")':'ax.set_ylabel("Monthly active users")'}`,
+ ai:'Make a line chart of monthly active users by app with direct labels at the end of each line instead of a legend. Make two versions side by side: linear y-axis and log y-axis, clearly labelled.',
+ draw(ctx,w,h,P,s){const f=F(w,h,58,110);const X=lin(0,23,f.l,f.r);let Y,yt;if(s.sc==='log'){Y=v=>f.b-(Math.log10(v)-3)/3*(f.b-f.t);yt=[1e3,1e4,1e5,1e6];}else{Y=lin(0,8e5,f.b,f.t);yt=ticks(0,8e5,4);}
+  axes(ctx,f,{P,x:X,y:Y,xt:[0,3,6,9,12,15,18,21],xf:mlab,yt,yl:'Monthly active users'+(s.sc==='log'?' (log scale)':'')});APPS.forEach((a,i)=>{ctx.strokeStyle=P.s[i];ctx.lineWidth=2.5;path(ctx,a.v.map((_,t)=>t),a.v,X,Y);ctx.stroke();});endLabels(ctx,P,APPS.map((a,i)=>({c:P.s[i],y:Y(a.v[23]),t:a.name})),f.r+8);}});
+add(P3,{id:'stackplot',name:'Stacked area',fn:'plt.stackplot()',lvl:'Intermediate',q:'Composition',data:'Data: monthly cloud spend in $k by service, 2026.',
+ what:'Areas stacked on top of each other: the top edge is the total, each band is one part.',
+ pro:['Total and composition over time in one view'],
+ con:['Only the bottom band has a flat baseline','Upper bands\' trends are distorted by the bands below'],
+ use:'Totals over time with 2–4 components.',avoid:'When each component\'s own trend matters: use separate lines or small multiples.',
+ trap:'ML grows fastest, but on top of the stack its curve mixes with everything below. Tick "ML at the bottom" to see its real shape.',
+ controls:[{t:'check',k:'mlb',label:'ML at the bottom',v:false}],
+ code:s=>`wide = df.pivot(index="month", columns="service", values="cost")\n${s.mlb?'wide = wide[["ML"] + [c for c in wide.columns if c != "ML"]]   # put ML first (bottom)\n':''}plt.stackplot(wide.index, wide.T, labels=wide.columns)\nplt.legend(loc="upper left"); plt.ylabel("Cost ($k)")`,
+ ai:'Make a matplotlib stackplot of monthly cloud cost by service, with the fastest-growing service as the bottom layer and direct labels at the right edge instead of a legend.',
+ draw(ctx,w,h,P,s){const f=F(w,h,58,96);const order=s.mlb?[4,0,1,2,3,5]:[0,1,2,3,4,5];const tot=Array.from({length:12},(_,m)=>SERV.reduce((a,_,i)=>a+SPEND[i][m],0));const ym=Math.max(...tot)*1.08;const X=lin(0,11,f.l,f.r),Y=lin(0,ym,f.b,f.t);
+  axes(ctx,f,{P,x:X,y:Y,xt:[0,2,4,6,8,10],xf:m=>MON[m],yt:ticks(0,ym,5),yf:v=>'$'+v+'k',yl:'Monthly cost, 2026'});const base=new Array(12).fill(0);
+  order.forEach(i=>{const top=base.map((b,m)=>b+SPEND[i][m]);ctx.fillStyle=P.s[i];ctx.beginPath();top.forEach((v,m)=>m?ctx.lineTo(X(m),Y(v)):ctx.moveTo(X(m),Y(v)));for(let m=11;m>=0;m--)ctx.lineTo(X(m),Y(base[m]));ctx.closePath();ctx.fill();ctx.strokeStyle=P.surface;ctx.lineWidth=1;ctx.stroke();ctx.fillStyle=P.s[i];ctx.font=P.bold;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(SERV[i],f.r+8,Y((base[11]+top[11])/2));top.forEach((v,m)=>base[m]=v);});}});
+add(P3,{id:'slope',name:'Slope chart',fn:'plt.plot([0, 1], [a, b])',lvl:'Intermediate',q:'Change over time',data:'Data: monthly active users of 4 apps, Jan 2025 and Dec 2026.',
+ what:'Two moments in time with a line per category connecting them. The slope shows the direction and size of change.',
+ pro:['Clear before/after story','Shows rank changes'],
+ con:['Hides everything between the endpoints'],
+ use:'Start-vs-end or before/after comparisons.',avoid:'When the path matters, like seasonal or volatile series.',
+ trap:'Mapsy looks almost flat, yet it swings ±35% every year. Two endpoints can hide the whole story.',
+ controls:[],
+ code:()=>`d = df[df.month.isin(["2025-01", "2026-12"])].pivot(index="app", columns="month", values="users")\nfor app, (a, b) in d.iterrows():\n    plt.plot([0, 1], [a, b], marker="o")\n    plt.text(1.03, b, f"{app} {b / a - 1:+.0%}", va="center")\nplt.xticks([0, 1], ["Jan 2025", "Dec 2026"])`,
+ ai:'Make a matplotlib slope chart comparing each app\'s monthly active users in Jan 2025 and Dec 2026, labelling each line at the right with the app name and percent change.',
+ draw(ctx,w,h,P,s){const f=F(w,h,80,170);const Y=lin(0,8e5,f.b,f.t);axes(ctx,f,{P,y:Y,yt:ticks(0,8e5,4),yl:'Monthly active users'});const x0=f.l+30,x1=f.r-10;ctx.strokeStyle=P.line;[x0,x1].forEach(x=>{ctx.beginPath();ctx.moveTo(x,f.t);ctx.lineTo(x,f.b);ctx.stroke();});
+  ctx.fillStyle=P.muted;ctx.font=P.bold;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('Jan 2025',x0,f.b+8);ctx.fillText('Dec 2026',x1,f.b+8);
+  APPS.forEach((a,i)=>{ctx.strokeStyle=P.s[i];ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x0,Y(a.v[0]));ctx.lineTo(x1,Y(a.v[23]));ctx.stroke();mark(ctx,'o',x0,Y(a.v[0]),10,P.s[i]);mark(ctx,'o',x1,Y(a.v[23]),10,P.s[i]);});
+  endLabels(ctx,P,APPS.map((a,i)=>({c:P.s[i],y:Y(a.v[23]),t:`${a.name} ${a.v[23]/a.v[0]>=1?'+':''}${fmt((a.v[23]/a.v[0]-1)*100)}%`})),x1+12);}});
+add(P3,{id:'donut',name:'Donut chart',fn:"plt.pie(wedgeprops={'width': 0.4})",lvl:'Intermediate',q:'Composition',data:'Data: December 2026 cloud spend by service.',
+ what:'A pie with the center removed, leaving room for a total or headline number.',
+ pro:['The center can hold the total','Same parts-of-whole reading as a pie'],
+ con:['Removes the angle cue, so it\'s even harder to compare slices than a pie'],
+ use:'Dashboard tiles that need a headline total and a rough split.',avoid:'Any precise comparison between parts.',
+ trap:'The thinner the ring, the harder slices are to compare. Readers judge arc length, not angle.',
+ controls:[{t:'range',k:'hole',label:'Hole size',min:.3,max:.85,step:.05,v:.6,fmt:v=>Math.round(v*100)+'%'}],
+ code:s=>`fig, ax = plt.subplots()\nax.pie(dec.cost, labels=dec.service, autopct="%1.0f%%", startangle=90,\n       wedgeprops={"width": ${(1-s.hole).toFixed(2)}}, pctdistance=${(1-(1-s.hole)/2).toFixed(2)})\nax.text(0, 0, f"\${dec.cost.sum():.0f}k", ha="center", va="center", fontsize=16)`,
+ ai:'Make a matplotlib donut chart of December 2026 cloud cost by service with the total written in the center and percentage labels on the ring.',
+ draw(ctx,w,h,P,s){const v=SPEND.map(a=>a[11]);const r=Math.min(w*.22,h*.34);pie(ctx,P,w/2,h/2+8,r,v,SERV,P.s,{inner:+s.hole,pct:true,pctd:0,start:-Math.PI/2,cw:true});const tot=v.reduce((a,b)=>a+b,0);if(+s.hole>.45){ctx.fillStyle=P.ink;ctx.font='700 22px "Bricolage Grotesque", system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$'+tot.toFixed(0)+'k',w/2,h/2+8);}}});
+add(P3,{id:'bubble',name:'Bubble chart',fn:'plt.scatter(s=…)',lvl:'Intermediate',q:'Relationship',data:'Data: 60 home sales: size, price, number of rooms and age.',
+ what:'A scatter plot where marker area encodes a third variable and color can encode a fourth.',
+ pro:['Packs 3–4 variables into one view'],
+ con:['Area is judged poorly; big bubbles cover small ones','Easy to scale radius instead of area by mistake'],
+ use:'A few dozen points where a third variable has a clear story.',avoid:'Hundreds of points, or when sizes must be compared precisely.',
+ trap:'Matplotlib\'s s= is marker area, which is correct. Tick "Scale radius (wrong)": a 6-room home now looks 36× a 1-room home instead of 6×.',
+ controls:[{t:'check',k:'rad',label:'Scale radius (wrong)',v:false}],
+ code:s=>`d = homes.sample(60, random_state=1)\nplt.scatter(d.size_m2, d.price_k, s=${s.rad?'(d.rooms * 4) ** 2   # WRONG: radius ∝ rooms':'d.rooms * 60          # area ∝ rooms'},\n            c=d.age, cmap="viridis", alpha=0.8, edgecolor="white")\nplt.colorbar(label="Age (years)")`,
+ ai:'Make a matplotlib bubble chart of 60 homes: x = size in m², y = price in $k, bubble area proportional to rooms, color = age with the viridis colormap and a colorbar.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(30,330,f.l,f.r),Y=lin(0,1000,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(30,330,6),yt:ticks(0,1000,5),yf:v=>'$'+v+'k',xl:'Size (m²)',yl:'Price · size = rooms · color = age'});
+  Array.from({length:60},(_,i)=>i*13).sort((a,b)=>H.rooms[b]-H.rooms[a]).forEach(i=>{const rm=H.rooms[i];const r=s.rad?3*rm:7.5*Math.sqrt(rm);ctx.fillStyle=rgb(viridis(H.age[i]/80));ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(X(H.size[i]),Y(H.price[i]),r,0,7);ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=P.surface;ctx.lineWidth=1;ctx.stroke();});}});
+add(P3,{id:'hexbin',name:'Hexbin',fn:'plt.hexbin()',lvl:'Advanced',q:'Relationship',data:'Data: 8,000 home sales: size and price.',
+ what:'Divides the plane into hexagons and colors each by how many points fall inside. The fix for overplotted scatter plots.',
+ pro:['Handles millions of points','Shows where data concentrates'],
+ con:['Individual points and outliers disappear','Hexagon size changes the picture'],
+ use:'Relationships in large samples.',avoid:'Small samples, where the points themselves are clearer.',
+ trap:'Switch to scatter: 8,000 solid points merge into a blob. Use bins="log" so sparse areas don\'t all look empty.',
+ controls:[{t:'seg',k:'m',label:'Draw as',opts:[['scatter','scatter'],['hex','hexbin']],v:'hex'},{t:'range',k:'r',label:'Hexagon size (px)',min:5,max:22,step:1,v:10,fmt:v=>v}],
+ code:s=>s.m==='scatter'?`plt.scatter(homes.size_m2, homes.price_k, s=10)   # 8,000 points overlap`:`plt.hexbin(homes.size_m2, homes.price_k, gridsize=${Math.round(560/(+s.r*1.73))}, bins="log", cmap="viridis", mincnt=1)\nplt.colorbar(label="log10(count)")`,
+ ai:'Make a matplotlib hexbin of price against size for all homes with about 35 hexagons across, a log color scale, the viridis colormap, and a labelled colorbar.',
+ draw(ctx,w,h,P,s){const f=F(w,h);const X=lin(30,330,f.l,f.r),Y=lin(0,1000,f.b,f.t);axes(ctx,f,{P,x:X,y:Y,xt:ticks(30,330,6),yt:ticks(0,1000,5),yf:v=>'$'+v+'k',xl:'Size (m²)',yl:'Price · 8,000 homes'});
+  if(s.m==='scatter'){ctx.fillStyle=P.s[0];for(let i=0;i<HN;i++){ctx.beginPath();ctx.arc(X(H.size[i]),Y(H.price[i]),2.2,0,7);ctx.fill();}return;}
+  const mx=hexbin(ctx,f,H.size,H.price,X,Y,+s.r,t=>rgb(viridis(.1+.9*t)));note(ctx,P,`Max ${mx} homes in one hexagon (log color)`,f.r,f.t-10,P.muted,'right');}});
+add(P3,{id:'waffle',name:'Waffle chart',fn:'pywaffle.Waffle',lvl:'Advanced',q:'Composition',data:'Data: December 2026 cloud spend by service.',
+ what:'A 10 × 10 grid where each square is 1%. A countable alternative to the pie chart.',
+ pro:['Each square is a concrete, countable 1%','Friendly for non-technical audiences'],
+ con:['Rounds to whole percents','Needs an extra library (pywaffle)'],
+ use:'Communicating shares to a general audience.',avoid:'Precise values or parts under 1%.',
+ trap:'Rounding each share separately can leave 99 or 101 squares. Round so the total is exactly 100, as this chart does.',
+ controls:[],
+ code:()=>`from pywaffle import Waffle   # pip install pywaffle\nshares = (dec.set_index("service").cost / dec.cost.sum() * 100).round()\nplt.figure(FigureClass=Waffle, rows=10, columns=10, values=shares.to_dict(),\n           legend={"loc": "upper left", "bbox_to_anchor": (1, 1)})`,
+ ai:'Make a 10×10 waffle chart of December 2026 cloud cost share by service using pywaffle, rounding shares so they sum to exactly 100.',
+ draw(ctx,w,h,P,s){const v=SPEND.map(a=>a[11]),tot=v.reduce((a,b)=>a+b,0);const raw=v.map(x=>x/tot*100);const fl=raw.map(Math.floor);const left=100-fl.reduce((a,b)=>a+b,0);raw.map((x,i)=>[x-fl[i],i]).sort((a,b)=>b[0]-a[0]).slice(0,left).forEach(([,i])=>fl[i]++);
+  const cell=Math.min((h-80)/10,(w*.5)/10);const ox=24,oy=48;let k=0;fl.forEach((c,i)=>{for(let j=0;j<c;j++,k++){ctx.fillStyle=P.s[i];ctx.fillRect(ox+(k%10)*cell+1.5,oy+Math.floor(k/10)*cell+1.5,cell-3,cell-3);}});
+  const lx=ox+cell*10+28;ctx.font=P.sans;ctx.textBaseline='middle';fl.forEach((c,i)=>{const y=oy+12+i*26;ctx.fillStyle=P.s[i];ctx.fillRect(lx,y-6,12,12);ctx.fillStyle=P.ink;ctx.textAlign='left';ctx.fillText(`${SERV[i]}  ${c}%`,lx+18,y);});note(ctx,P,'1 square = 1%',24,34,P.muted);}});
+add(P3,{id:'treemap',name:'Treemap',fn:'squarify.plot()',lvl:'Advanced',q:'Composition',data:'Data: December 2026 cloud spend by service.',
+ what:'Rectangles sized by value, packed into one big rectangle. Can nest to show a hierarchy.',
+ pro:['Handles many parts and nested categories','Uses space efficiently'],
+ con:['Areas are judged imprecisely','Small parts end up unlabeled'],
+ use:'Many categories or a hierarchy (service → resource → project).',avoid:'A handful of parts, or precise comparison.',
+ trap:'Readers compare rectangles with different shapes poorly. Long thin boxes look smaller than square ones of the same area.',
+ controls:[],
+ code:()=>`import squarify   # pip install squarify\ndec = dec.sort_values("cost", ascending=False)\nsquarify.plot(sizes=dec.cost, label=dec.service, pad=True)\nplt.axis("off")\n# hierarchies: plotly.express.treemap(df, path=["service", "resource"], values="cost")`,
+ ai:'Make a treemap of December 2026 cloud cost by service using squarify, labelling each rectangle with the service name and cost in $k.',
+ draw(ctx,w,h,P,s){const v=SPEND.map((a,i)=>({v:a[11],i})).sort((a,b)=>b.v-a.v);squarify(v,16,40,w-32,h-56).forEach(r=>{ctx.fillStyle=P.s[r.i];ctx.fillRect(r.x+1,r.y+1,r.w-2,r.h-2);if(r.w>60&&r.h>34){ctx.fillStyle='#ffffff';ctx.font=P.bold;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(SERV[r.i],r.x+8,r.y+8);ctx.font=P.mono;ctx.fillText('$'+r.v.toFixed(1)+'k',r.x+8,r.y+24);}});note(ctx,P,'December 2026 spend by service',16,30,P.muted);}});
+
+/* ================= UI ================= */
+const ST={};L.forEach((c,i)=>{c.i=i;ST[c.id]={};(c.controls||[]).forEach(k=>ST[c.id][k.k]=k.v);});
+let cur=0,codeTab='py';const FINDER=L.length;
+const rail=$('#rail'),msel=$('#m-sel');
+[1,2,3].forEach(p=>{const hd=document.createElement('h4');hd.innerHTML=`${PARTS[p].name}<span>${PARTS[p].sub}</span>`;rail.appendChild(hd);const og=document.createElement('optgroup');og.label=PARTS[p].name;
+ L.filter(c=>c.part===p).forEach(c=>{const b=document.createElement('button');b.dataset.i=c.i;b.innerHTML=`<span class="n">${String(c.i+1).padStart(2,'0')}</span><span>${c.name}</span><span class="ld ${c.lvl}" title="${c.lvl}"></span>`;b.addEventListener('click',()=>go(c.i,true));rail.appendChild(b);const o=document.createElement('option');o.value=c.i;o.textContent=`${c.i+1}. ${c.name}`;og.appendChild(o);});msel.appendChild(og);});
+{const hd=document.createElement('h4');hd.textContent='Reference';rail.appendChild(hd);const b=document.createElement('button');b.dataset.i=FINDER;b.innerHTML='<span class="n">→</span><span>Chart finder</span><span></span>';b.addEventListener('click',()=>go(FINDER,true));rail.appendChild(b);const o=document.createElement('option');o.value=FINDER;o.textContent='Chart finder';msel.appendChild(o);}
+msel.addEventListener('change',()=>go(+msel.value,true));
+[['#prev',-1],['#prev2',-1],['#m-prev',-1],['#next',1],['#next2',1],['#m-next',1]].forEach(([s,d])=>$(s).addEventListener('click',()=>go(Math.max(0,Math.min(FINDER,cur+d)),true,true)));
+function go(i,push,scroll){cur=i;document.querySelectorAll('.rail button').forEach(b=>b.setAttribute('aria-current',+b.dataset.i===i));msel.value=i;
+ if(push){try{history.replaceState(null,'','#'+(i===FINDER?'finder':L[i].id));}catch(e){}}
+ if(scroll){try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){}}
+ if(i===FINDER){$('#lessonview').hidden=true;$('#finderview').hidden=false;return;}
+ $('#lessonview').hidden=false;$('#finderview').hidden=true;const c=L[i];
+ $('#l-eyebrow').textContent=`${PARTS[c.part].name} · Step ${i+1} of ${L.length}`;$('#l-name').textContent=c.name;$('#l-fn').textContent=c.fn;$('#l-level').innerHTML=`<span class="ld ${c.lvl}"></span>${c.lvl}`;$('#l-q').textContent='Answers: '+c.q;
+ $('#l-what').textContent=c.what;$('#l-data').textContent=c.data;$('#l-data').hidden=!c.data;
+ $('#s-pro').innerHTML=c.pro.map(x=>`<li>${x}</li>`).join('');$('#s-con').innerHTML=c.con.map(x=>`<li>${x}</li>`).join('');$('#s-use').textContent=c.use;$('#s-avoid').textContent=c.avoid;$('#s-trap').innerHTML='<b>Watch for:</b> '+c.trap;
+ $('#prev').disabled=$('#prev2').disabled=$('#m-prev').disabled=i===0;
+ $('#prev2').textContent=i>0?'← '+L[i-1].name:'← Previous';$('#next2').textContent=i<L.length-1?L[i+1].name+' →':'Chart finder →';
+ $('#cv').classList.toggle('tall',!!c.tall);buildControls();renderCode();draw();}
+function buildControls(){const c=L[cur],box=$('#ctl');box.innerHTML='';const st=ST[c.id];const cs=c.controls||[];box.hidden=!cs.length;
+ cs.forEach(k=>{const id=`c-${c.id}-${k.k}`;const d=document.createElement('div');d.className='ctl';
+  if(k.t==='range'){d.innerHTML=`<label class="lbl" for="${id}">${k.label} <output>${k.fmt(st[k.k])}</output></label><input type="range" id="${id}" min="${k.min}" max="${k.max}" step="${k.step}" value="${st[k.k]}">`;d.querySelector('input').addEventListener('input',e=>{st[k.k]=e.target.value;d.querySelector('output').textContent=k.fmt(e.target.value);upd();});}
+  else if(k.t==='check'){d.innerHTML=`<label class="check"><input type="checkbox" id="${id}" ${st[k.k]?'checked':''}> <span class="mono" style="font-size:13px">${k.label}</span></label>`;d.querySelector('input').addEventListener('change',e=>{st[k.k]=e.target.checked;upd();});}
+  else if(k.t==='select'){d.innerHTML=`<label class="lbl" for="${id}">${k.label}</label><select id="${id}">${k.opts.map(([v,l])=>`<option value="${v}" ${v===st[k.k]?'selected':''}>${l}</option>`).join('')}</select>`;d.querySelector('select').addEventListener('change',e=>{st[k.k]=e.target.value;upd();});}
+  else if(k.t==='seg'){d.innerHTML=`<span class="lbl">${k.label}</span><div class="seg" role="radiogroup" aria-label="${k.label}">${k.opts.map(([v,l],j)=>`<label><input type="radio" name="${id}" id="${id}-${j}" value="${v}" ${v===st[k.k]?'checked':''}><span class="mono" style="font-size:12px">${l}</span></label>`).join('')}</div>`;d.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',e=>{st[k.k]=e.target.value;upd();}));}
+  box.appendChild(d);});}
+function upd(){renderCode();draw();}
+function renderCode(){const c=L[cur];const py=codeTab==='py';$('#tab-py').setAttribute('aria-selected',py);$('#tab-ai').setAttribute('aria-selected',!py);const pre=$('#code');pre.textContent=py?c.code(ST[c.id]):c.ai;pre.classList.toggle('wrapme',!py);$('#live').hidden=!py||!(c.controls||[]).length;
+ $('#code-foot').textContent=!py?'Paste into any coding assistant along with df.head() or your column names, then check the result against the "Watch for" note.':c.part===1?'Assumes: import matplotlib.pyplot as plt, import pandas as pd, import numpy as np (the L11a setup cell).':c.part===2?'Assumes the L11b setup cell: imports, sns.set_theme(style="whitegrid") and the df with age, salary, height, weight, gender, department, experience, performance_score.':'Assumes a pandas DataFrame with the columns described above, plus the usual imports.';}
+$('#tab-py').addEventListener('click',()=>{codeTab='py';renderCode();});$('#tab-ai').addEventListener('click',()=>{codeTab='ai';renderCode();});
+$('#copy').addEventListener('click',e=>{const b=e.currentTarget,txt=$('#code').textContent;const sel=()=>{const r=document.createRange();r.selectNodeContents($('#code'));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Press Ctrl/⌘+C';setTimeout(()=>b.textContent='Copy',2000);};
+ try{navigator.clipboard.writeText(txt).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1400);},sel);}catch(err){sel();}});
+function draw(){if(cur===FINDER)return;const cv=$('#cv');if(!cv.clientWidth)return;const dpr=window.devicePixelRatio||1;const w=cv.clientWidth,h=cv.clientHeight;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+ try{L[cur].draw(ctx,w,h,pal(),ST[L[cur].id]);}catch(e){console.error(e);}}
+(function(){const QS=[['Compare','Which category is bigger?'],['Distribution','How are values spread out?'],['Relationship','How do two or more variables move together?'],['Composition','What is the whole made of?'],['Change over time','How does it evolve?'],['Quick exploration','Fast first look at a DataFrame'],['Layout & style','Arranging and polishing charts']];
+ $('#finder').innerHTML=QS.map(([q,sub])=>{const rows=L.filter(c=>c.q===q);if(!rows.length)return'';return `<div class="qgroup"><h3>${q}</h3><p class="small">${sub}</p><div class="tablebox"><table><thead><tr><th>Step</th><th>Function</th><th>Level</th><th>Use it when</th><th>Avoid it when</th></tr></thead><tbody>${rows.map(c=>`<tr><td class="n"><button data-i="${c.i}">${c.i+1}. ${c.name}</button></td><td class="lib">${c.fn}</td><td style="white-space:nowrap"><span class="ld ${c.lvl}"></span>${c.lvl}</td><td>${c.use}</td><td>${c.avoid}</td></tr>`).join('')}</tbody></table></div></div>`;}).join('');
+ $('#finder').querySelectorAll('button[data-i]').forEach(b=>b.addEventListener('click',()=>go(+b.dataset.i,true,true)));})();
+let rt;new ResizeObserver(()=>{cancelAnimationFrame(rt);rt=requestAnimationFrame(draw);}).observe($('#cv'));
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);}catch(e){}
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+const h0=(location.hash||'').slice(1);go(h0==='finder'?FINDER:Math.max(0,L.findIndex(c=>c.id===h0)),false);
+})();
+</script>
